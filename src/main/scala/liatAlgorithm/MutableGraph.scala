@@ -1,3 +1,5 @@
+package liatAlgorithm
+
 import java.awt.Color
 import scala.collection.mutable
 
@@ -111,7 +113,7 @@ class MutableGraph(nodes : Set[Int])
         var m_state = Color.WHITE
         
         // for the sort in the start of topological sort (maybe unnecessary)
-        override def compare(that: Node) = this.m_neighbors.size - that.m_neighbors.size
+        override def compare(that: Node) = this.m_neighbors.size compare that.m_neighbors.size
     }
     
     private case class Edge (m_src : Int, m_dest : Int, m_weight : Double)
