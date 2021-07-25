@@ -1,4 +1,4 @@
-package probability
+package model.probability
 
 trait RandomVariable[T]
 {

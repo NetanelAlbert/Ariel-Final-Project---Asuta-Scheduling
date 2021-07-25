@@ -1,13 +1,9 @@
-package DTOs
-
-import org.apache.commons.math3.distribution.EnumeratedIntegerDistribution
-
-import java.sql.{Date, Timestamp}
+package model.DTOs
 
 case class SurgeonStatistics
 (
     id : Int,
-    name : String,
+    name : Option[String],
     amountOfData : Int,
     profitAvg : Double,
     surgeryDurationAvgMinutes : Double,
@@ -17,9 +13,14 @@ case class SurgeonStatistics
 )
 object SurgeonStatistics
 {
+    val tupled = (this.apply _).tupled
+}
+
+object SurgeonStatisticsAutoAvg
+{
     // To compute "globalAvg" auto, but still enable json formatting
     def apply(id : Int,
-              name : String,
+              name : Option[String],
               amountOfData : Int,
               profitAvg : Double,
               surgeryDurationAvgMinutes : Double,
@@ -46,29 +47,3 @@ object SurgeonStatistics
     }
 }
 
-case class SurgeryStatistics
-(
-    operationCode : Double,
-    restingDistribution : EnumeratedIntegerDistribution,
-    hospitalizationDistribution : EnumeratedIntegerDistribution,
-    profit : Double
-)
-
-case class SurgeryInfo
-(
-    operationCode : Double,
-    surgeonId : Int,
-    surgeryDurationMinutes : Int,
-    restingMinutes : Int,
-    hospitalizationHours : Int,
-    blockStart : Timestamp,
-    blockEnd : Timestamp
-)
-
-object FormattingProtocols
-{
-    import spray.json.DefaultJsonProtocol._
-    
-    implicit val SurgeonStatisticsFormat = jsonFormat8(SurgeonStatistics.apply)
-    
-}

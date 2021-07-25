@@ -1,4 +1,4 @@
-package probability
+package model.probability
 
 import scala.collection.immutable.HashMap
 // todo find a way to make it generic and be able to multiply in expectation()

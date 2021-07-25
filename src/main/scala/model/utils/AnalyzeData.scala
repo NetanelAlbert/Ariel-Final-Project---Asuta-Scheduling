@@ -1,8 +1,8 @@
-package utils
+package model.utils
 
 
 import org.apache.poi.ss.usermodel.{DataFormatter, Row}
-import DTOs.{SurgeonStatistics, SurgeryInfo, SurgeryStatistics}
+import model.DTOs.{SurgeonStatistics, SurgeonStatisticsAutoAvg, PastSurgeryInfo, SurgeryStatistics}
 import org.apache.commons.math3.distribution.EnumeratedIntegerDistribution
 
 import java.sql.Timestamp
@@ -12,7 +12,7 @@ import scala.util.Try
 
 object AnalyzeData
 {
-    def getSurgeonStatisticsFromSurgeryInfo(surgeryList : List[SurgeryInfo]) : List[SurgeonStatistics] =
+    def getSurgeonStatisticsFromSurgeryInfo(surgeryList : List[PastSurgeryInfo]) : List[SurgeonStatistics] =
     {
         surgeryList.groupBy(_.surgeonId).map
         {
@@ -29,7 +29,7 @@ object AnalyzeData
                 val restingDurationAvgMinutes = resting.toDouble/amountOfData
                 val hospitalizationDurationAvgHours = hospitalization.toDouble/amountOfData
     
-                SurgeonStatistics(
+                SurgeonStatisticsAutoAvg(
                     id,
                     name,
                     amountOfData,
@@ -42,7 +42,7 @@ object AnalyzeData
         }.toList
     }
     
-    def getSurgeryStatisticsFromSurgeryInfo(surgeryList : List[SurgeryInfo]) : List[SurgeryStatistics] =
+    def getSurgeryStatisticsFromSurgeryInfo(surgeryList : List[PastSurgeryInfo]) : List[SurgeryStatistics] =
     {
         surgeryList.groupBy(_.operationCode).map
         {
@@ -57,14 +57,14 @@ object AnalyzeData
         }.toList
     }
     
-    def getSurgeryStatisticsBySurgeonFromSurgeryInfo(surgeryList : List[SurgeryInfo]) : Map[Int, List[SurgeryStatistics]] =
+    def getSurgeryStatisticsBySurgeonFromSurgeryInfo(surgeryList : List[PastSurgeryInfo]) : Map[Int, List[SurgeryStatistics]] =
     {
         surgeryList.groupBy(_.surgeonId).mapValues(getSurgeryStatisticsFromSurgeryInfo)
     }
     
-    def addSurgeryInfoToTuple(tuple : (Int, Int, Int), surgeryInfo : SurgeryInfo) : (Int, Int, Int) = surgeryInfo match
+    def addSurgeryInfoToTuple(tuple : (Int, Int, Int), surgeryInfo : PastSurgeryInfo) : (Int, Int, Int) = surgeryInfo match
     {
-        case SurgeryInfo(_, _, surgeryDurationMinutes, restingMinutes, hospitalizationHours, _, _) =>
+        case PastSurgeryInfo(_, _, surgeryDurationMinutes, restingMinutes, hospitalizationHours, _, _) =>
         {
             sumTwoTuples(tuple, (surgeryDurationMinutes, restingMinutes, hospitalizationHours))
         }
@@ -77,7 +77,7 @@ object AnalyzeData
     
     
     
-    def getAllSurgeryInfo(path : String) : List[SurgeryInfo] =
+    def getAllSurgeryInfo(path : String) : List[PastSurgeryInfo] =
     {
         import SurgeryDataExcel._
         //todo extract info about who can work in each hour
@@ -97,8 +97,8 @@ object AnalyzeData
                val blockStart = new Timestamp(sdFormat.parse(blockStartString).getTime)
                val blockEndString = formatter.formatCellValue(row.getCell(blockEndIndex))
                val blockEnd = new Timestamp(sdFormat.parse(blockEndString).getTime)
-        
-               SurgeryInfo(operationCode,
+    
+               PastSurgeryInfo(operationCode,
                            surgeonId,
                            surgeryDurationMinutes,
                            restingMinutes,

@@ -1,4 +1,4 @@
-package liatAlgorithm
+package model.liatAlgorithm
 
 import java.awt.Color
 import scala.collection.mutable

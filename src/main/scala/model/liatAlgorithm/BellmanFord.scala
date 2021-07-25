@@ -1,6 +1,6 @@
-package liatAlgorithm
+package model.liatAlgorithm
 
-import probability.IntegerDistribution
+import model.probability.IntegerDistribution
 
 object BellmanFord
 {

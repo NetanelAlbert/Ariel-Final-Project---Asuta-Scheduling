@@ -1,18 +1,19 @@
-package db
+package dbTests
 
-import DTOs.{SurgeonStatistics, SurgeryStatistics}
-import db.Table.testDBLocation
+import model.db.Table
+import model.DTOs.{SurgeonStatistics, SurgeonStatisticsAutoAvg, SurgeryStatistics}
+import model.db.Table.testDBLocation
 import org.apache.commons.math3.distribution.EnumeratedIntegerDistribution
 import org.scalatest.Matchers.convertToAnyShouldWrapper
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
-import utils.FileOps
+import model.utils.FileOps
 
 import java.sql.SQLSyntaxErrorException
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.language.postfixOps
 
-class SurgeryStatisticsTableTest extends HyperSQLTablesTest[SurgeryStatistics] with TableInfo[SurgeryStatistics]
+class SurgeryStatisticsTableTest123 extends HyperSQLTablesTest[SurgeryStatistics] with TableInfo[SurgeryStatistics]
 {
     override val table = new SurgeryStatisticsTable(testDBLocation)
     override val objects = List(
@@ -28,13 +29,13 @@ class SurgeryStatisticsTableTest extends HyperSQLTablesTest[SurgeryStatistics] w
     }
 }
 
-class SurgeonStatisticsTableTest extends HyperSQLTablesTest[SurgeonStatistics] with TableInfo[SurgeonStatistics]
+class SurgeonStatisticsTableTest123 extends HyperSQLTablesTest[SurgeonStatistics] with TableInfo[SurgeonStatistics]
 {
     override val table = new SurgeonStatisticsTable(testDBLocation)
     override val objects = List(
-        SurgeonStatistics(1, "David", 450, 2.543, 6453.34, .3, 54.656),
-        SurgeonStatistics(2, "Avi", 99540, 4.5643, 6.3441, 3643.8, 11.3356),
-        SurgeonStatistics(3, "Dan", 451, 264.5, 613.3534, 33.782, 4.6)
+        SurgeonStatisticsAutoAvg(1, "David", 450, 2.543, 6453.34, .3, 54.656),
+        SurgeonStatisticsAutoAvg(2, "Avi", 99540, 4.5643, 6.3441, 3643.8, 11.3356),
+        SurgeonStatisticsAutoAvg(3, "Dan", 451, 264.5, 613.3534, 33.782, 4.6)
     )
 //        SurgeryStatistics(1.2, new EnumeratedIntegerDistribution(Array(1, 1, 2)), new EnumeratedIntegerDistribution(Array(3, 4, 5)), 122),
 //        SurgeryStatistics(1.4, new EnumeratedIntegerDistribution(Array(2, 1, 2)), new EnumeratedIntegerDistribution(Array(3, 3, 3)), 159),

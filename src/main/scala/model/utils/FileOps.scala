@@ -1,4 +1,4 @@
-package utils
+package model.utils
 
 import org.apache.poi.ss.usermodel.{DataFormatter, Row, Sheet, WorkbookFactory}
 import spray.json.DefaultJsonProtocol
@@ -8,8 +8,8 @@ import DefaultJsonProtocol._
 import java.io.File
 import java.io.PrintWriter
 import collection.JavaConversions._
-import DTOs.FormattingProtocols._
-import DTOs.{SurgeonStatistics, SurgeryInfo}
+import model.DTOs.FormattingProtocols._
+import model.DTOs.{SurgeonStatistics, PastSurgeryInfo}
 
 import java.sql.{Date, Timestamp}
 import java.util.concurrent.TimeUnit
