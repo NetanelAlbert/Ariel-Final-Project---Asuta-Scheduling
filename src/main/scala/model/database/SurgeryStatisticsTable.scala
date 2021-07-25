@@ -1,6 +1,6 @@
 package model.database
 
-import DTOs.SurgeryStatistics
+import model.DTOs.SurgeryStatistics
 import org.apache.commons.math3.distribution.EnumeratedIntegerDistribution
 import slick.jdbc.HsqldbProfile.api._
 import slick.jdbc.HsqldbProfile.backend.DatabaseDef
@@ -12,7 +12,7 @@ import scala.concurrent.Future
 
 class SurgeryStatisticsSchema(tag: Tag) extends Table[SurgeryStatistics](tag, "SurgeryStatistics")
 {
-    import DTOs.FormattingProtocols._
+    import model.DTOs.FormattingProtocols._
     
     
     def operationCode = column[Double]("operationCode", O.PrimaryKey)

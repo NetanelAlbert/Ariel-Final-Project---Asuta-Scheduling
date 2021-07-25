@@ -11,7 +11,7 @@ object FormattingProtocols
     import spray.json.DefaultJsonProtocol._
     import slick.jdbc.HsqldbProfile.api._
     
-    implicit val SurgeonStatisticsFormat = jsonFormat8(SurgeonStatistics.apply)
+    implicit val DoctorStatisticsFormat = jsonFormat8(DoctorStatistics.apply)
     
     implicit val EnumeratedIntegerDistributionMapper = MappedColumnType.base[EnumeratedIntegerDistribution, Blob](
         distribution =>

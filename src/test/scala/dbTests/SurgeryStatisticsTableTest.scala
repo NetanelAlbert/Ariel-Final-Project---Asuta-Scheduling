@@ -1,13 +1,13 @@
 package dbTests
 
-import DTOs.SurgeryStatistics
-import db.Utils._
-import db.slick.DBConnection
+import model.DTOs.SurgeryStatistics
+import model.database.{DBConnection, SurgeryStatisticsTable}
 import org.apache.commons.math3.distribution.EnumeratedIntegerDistribution
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 
 import scala.concurrent.ExecutionContext
 import scala.language.postfixOps
+import Utils._
 
 
 class SurgeryStatisticsTableTest extends FlatSpec with Matchers with BeforeAndAfterAll
@@ -15,7 +15,7 @@ class SurgeryStatisticsTableTest extends FlatSpec with Matchers with BeforeAndAf
     implicit val ec = ExecutionContext.global
     
     val db = DBConnection.get(test = true)
-    val table = new slick.SurgeryStatisticsTable(db)
+    val table = new SurgeryStatisticsTable(db)
     
     val objects = List(
         SurgeryStatistics(1.2, new EnumeratedIntegerDistribution(Array(1, 1, 2)), new EnumeratedIntegerDistribution(Array(3, 4, 5)), 122),

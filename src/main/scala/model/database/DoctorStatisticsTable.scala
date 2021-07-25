@@ -1,6 +1,6 @@
 package model.database
 
-import model.DTOs.SurgeonStatistics
+import model.DTOs.DoctorStatistics
 import slick.jdbc.HsqldbProfile.api._
 import slick.lifted.ProvenShape.proveShapeOf
 import slick.lifted.Tag
@@ -10,12 +10,12 @@ import scala.concurrent.Future
 
 
 
-class SurgeonStatisticsSchema(tag: Tag) extends Table[SurgeonStatistics](tag, "SurgeonStatistics")
+class DoctorStatisticsSchema(tag: Tag) extends Table[DoctorStatistics](tag, "DoctorStatistics")
 {
     
     def id = column[Int]("id", O.PrimaryKey)
     
-    def name = column[String]("name")
+    def name = column[Option[String]]("name")
     
     def amountOfData = column[Int]("amountOfData")
     
@@ -40,27 +40,27 @@ class SurgeonStatisticsSchema(tag: Tag) extends Table[SurgeonStatistics](tag, "S
         globalAvg
     )
     
-    override def * = columns.mapTo[SurgeonStatistics]
+    override def * = columns.mapTo[DoctorStatistics]
 }
 
-class SurgeonStatisticsTable(m_db : DatabaseDef) extends TableQuery(new SurgeonStatisticsSchema(_))
+class DoctorStatisticsTable(m_db : DatabaseDef) extends TableQuery(new DoctorStatisticsSchema(_))
 {
     def create() : Future[Unit] =
     {
         m_db.run(this.schema.createIfNotExists)
     }
     
-    def insert(element : SurgeonStatistics) : Future[Int] =
+    def insert(element : DoctorStatistics) : Future[Int] =
     {
         m_db.run(this += element)
     }
     
-    def insertAll(elements : Seq[SurgeonStatistics])  =
+    def insertAll(elements : Seq[DoctorStatistics])  =
     {
         m_db.run(this ++= elements)
     }
     
-    def selectAll() : Future[Seq[SurgeonStatistics]] =
+    def selectAll() : Future[Seq[DoctorStatistics]] =
     {
         m_db.run(this.result)
     }

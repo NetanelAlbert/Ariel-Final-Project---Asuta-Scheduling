@@ -1,4 +1,5 @@
 
+import model.database.DoctorStatisticsTable
 import model.utils.{AnalyzeData, FileOps}
 
 import java.sql.DriverManager
@@ -15,7 +16,7 @@ object SandBox
         val start = System.currentTimeMillis()
         
         val surgeries = AnalyzeData.getAllSurgeryInfo("SurgeriesData.xlsx")
-        //val surgeons = AnalyzeData.getSurgeonStatisticsFromSurgeryInfo(surgeries)
+        //val doctors = AnalyzeData.getDoctorStatisticsFromSurgeryInfo(surgeries)
     
         val surgeriesStatistic = AnalyzeData.getSurgeryStatisticsFromSurgeryInfo(surgeries)
         val end = System.currentTimeMillis()
@@ -30,7 +31,7 @@ object SandBox
     def vla
     {
         val db = Database.forURL("jdbc:hsqldb:file:database/model.db", "SA", "", executor = AsyncExecutor.default("DbExecutor", 3))
-        val table = new SurgeonStatisticsTable(db)
+        val table = new DoctorStatisticsTable(db)
     }
 
 }

@@ -2,7 +2,7 @@ package model.utils
 
 
 import org.apache.poi.ss.usermodel.{DataFormatter, Row}
-import model.DTOs.{SurgeonStatistics, SurgeonStatisticsAutoAvg, PastSurgeryInfo, SurgeryStatistics}
+import model.DTOs.{DoctorStatistics, DoctorStatisticsAutoAvg, PastSurgeryInfo, SurgeryStatistics}
 import org.apache.commons.math3.distribution.EnumeratedIntegerDistribution
 
 import java.sql.Timestamp
@@ -12,14 +12,14 @@ import scala.util.Try
 
 object AnalyzeData
 {
-    def getSurgeonStatisticsFromSurgeryInfo(surgeryList : List[PastSurgeryInfo]) : List[SurgeonStatistics] =
+    def getDoctorStatisticsFromSurgeryInfo(surgeryList : List[PastSurgeryInfo]) : List[DoctorStatistics] =
     {
-        surgeryList.groupBy(_.surgeonId).map
+        surgeryList.groupBy(_.doctorId).map
         {
             case (id, list) =>
             {
     
-                val name = "unknown" // todo get names
+                val name = None // todo get names
                 val amountOfData = list.length
                 val profitAvg = 1.11 // todo get profit
                 
@@ -29,7 +29,7 @@ object AnalyzeData
                 val restingDurationAvgMinutes = resting.toDouble/amountOfData
                 val hospitalizationDurationAvgHours = hospitalization.toDouble/amountOfData
     
-                SurgeonStatisticsAutoAvg(
+                DoctorStatisticsAutoAvg(
                     id,
                     name,
                     amountOfData,
@@ -57,9 +57,9 @@ object AnalyzeData
         }.toList
     }
     
-    def getSurgeryStatisticsBySurgeonFromSurgeryInfo(surgeryList : List[PastSurgeryInfo]) : Map[Int, List[SurgeryStatistics]] =
+    def getSurgeryStatisticsByDoctorFromSurgeryInfo(surgeryList : List[PastSurgeryInfo]) : Map[Int, List[SurgeryStatistics]] =
     {
-        surgeryList.groupBy(_.surgeonId).mapValues(getSurgeryStatisticsFromSurgeryInfo)
+        surgeryList.groupBy(_.doctorId).mapValues(getSurgeryStatisticsFromSurgeryInfo)
     }
     
     def addSurgeryInfoToTuple(tuple : (Int, Int, Int), surgeryInfo : PastSurgeryInfo) : (Int, Int, Int) = surgeryInfo match
@@ -87,7 +87,7 @@ object AnalyzeData
            Try
            {
                val operationCode = formatter.formatCellValue(row.getCell(operationCodeIndex)).toDouble
-               val surgeonId = formatter.formatCellValue(row.getCell(surgeonIdIndex)).toInt
+               val doctorId = formatter.formatCellValue(row.getCell(doctorIdIndex)).toInt
                val surgeryDurationMinutes = dateDiff(row, surgeryStartIndex, surgeryEndIndex, TimeUnit.MINUTES)
                val restingMinutes = dateDiff(row, restingStartIndex, restingEndIndex, TimeUnit.MINUTES)
                //TODO :: get hospitalization info from new file (Roy)
@@ -99,7 +99,7 @@ object AnalyzeData
                val blockEnd = new Timestamp(sdFormat.parse(blockEndString).getTime)
     
                PastSurgeryInfo(operationCode,
-                           surgeonId,
+                           doctorId,
                            surgeryDurationMinutes,
                            restingMinutes,
                            hospitalizationHours,
@@ -122,7 +122,7 @@ object AnalyzeData
     object SurgeryDataExcel
     {
         val operationCodeIndex = 2
-        val surgeonIdIndex = 1
+        val doctorIdIndex = 1
         val surgeryStartIndex = 20
         val surgeryEndIndex = 23
         val restingStartIndex = 25

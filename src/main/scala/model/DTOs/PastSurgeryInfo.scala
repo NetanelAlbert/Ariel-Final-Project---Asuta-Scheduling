@@ -5,7 +5,7 @@ import java.sql.Timestamp
 case class PastSurgeryInfo
 (
     operationCode : Double,
-    surgeonId : Int,
+    doctorId : Int,
     surgeryDurationMinutes : Int,
     restingMinutes : Int,
     hospitalizationHours : Int,

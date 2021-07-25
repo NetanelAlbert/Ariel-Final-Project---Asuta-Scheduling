@@ -1,25 +1,25 @@
 package dbTests
 
-import model.DTOs.SurgeonStatisticsAutoAvg
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 
 import scala.concurrent.ExecutionContext
 import scala.language.postfixOps
 import Utils._
-import model.database.DBConnection
+import model.DTOs.DoctorStatisticsAutoAvg
+import model.database.{DBConnection, DoctorStatisticsTable}
 
 
-class SurgeonStatisticsTableTest extends FlatSpec with Matchers with BeforeAndAfterAll
+class DoctorStatisticsTableTest extends FlatSpec with Matchers with BeforeAndAfterAll
 {
     implicit val ec = ExecutionContext.global
     
     val db = DBConnection.get(test = true)
-    val table = new slick.SurgeonStatisticsTable(db)
+    val table = new DoctorStatisticsTable(db)
     
     val objects = List(
-        SurgeonStatisticsAutoAvg(1, "David", 450, 2.543, 6453.34, .3, 54.656),
-        SurgeonStatisticsAutoAvg(2, "Avi", 99540, 4.5643, 6.3441, 3643.8, 11.3356),
-        SurgeonStatisticsAutoAvg(3, "Dan", 451, 264.5, 613.3534, 33.782, 4.6)
+        DoctorStatisticsAutoAvg(1, Some("David"), 450, 2.543, 6453.34, .3, 54.656),
+        DoctorStatisticsAutoAvg(2, Some("Avi"), 99540, 4.5643, 6.3441, 3643.8, 11.3356),
+        DoctorStatisticsAutoAvg(3, Some("Dan"), 451, 264.5, 613.3534, 33.782, 4.6)
         )
     
     it should "initial table" in

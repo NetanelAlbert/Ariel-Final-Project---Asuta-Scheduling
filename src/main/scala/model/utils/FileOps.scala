@@ -9,7 +9,7 @@ import java.io.File
 import java.io.PrintWriter
 import collection.JavaConversions._
 import model.DTOs.FormattingProtocols._
-import model.DTOs.{SurgeonStatistics, PastSurgeryInfo}
+import model.DTOs.{DoctorStatistics, PastSurgeryInfo}
 
 import java.sql.{Date, Timestamp}
 import java.util.concurrent.TimeUnit
@@ -20,12 +20,12 @@ object FileOps
 {
     val SURGEON_STATISTICS_JSON_PATH = "SURGEON_STATISTICS"
     
-    def createSurgeryAndSurgeonData(newDataPath : String)
+    def createSurgeryAndDoctorData(newDataPath : String)
     {
-        //val surgeonInfoList = getAllSurgeryInfo(newDataPath)
+        //val doctorInfoList = getAllSurgeryInfo(newDataPath)
         
         
-        //saveSurgeonInfo(surgeonInfoList)
+        //saveDoctorInfo(doctorInfoList)
     }
     
     def getSheet(path : String, index : Int = 0) : Sheet =
@@ -47,18 +47,18 @@ object FileOps
         }
     }
     
-    def saveSurgeonInfo(surgeonInfoList : List[SurgeonStatistics])
+    def saveDoctorInfo(doctorInfoList : List[DoctorStatistics])
     {
-        saveJsonToFile(surgeonInfoList.toJson, SURGEON_STATISTICS_JSON_PATH)
+        saveJsonToFile(doctorInfoList.toJson, SURGEON_STATISTICS_JSON_PATH)
     }
     
-    def getSurgeonInfo : List[SurgeonStatistics] =
+    def getDoctorInfo : List[DoctorStatistics] =
     {
         val source = scala.io.Source.fromFile("file.txt")
     
         try
         {
-            source.mkString.toJson.convertTo[List[SurgeonStatistics]]
+            source.mkString.toJson.convertTo[List[DoctorStatistics]]
         } finally source.close
     }
     

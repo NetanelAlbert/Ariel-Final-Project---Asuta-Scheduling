@@ -1,6 +1,6 @@
 package model.DTOs
 
-case class SurgeonStatistics
+case class DoctorStatistics
 (
     id : Int,
     name : Option[String],
@@ -11,12 +11,12 @@ case class SurgeonStatistics
     hospitalizationDurationAvgHours : Double,
     globalAvg : Double
 )
-object SurgeonStatistics
+object DoctorStatistics
 {
     val tupled = (this.apply _).tupled
 }
 
-object SurgeonStatisticsAutoAvg
+object DoctorStatisticsAutoAvg
 {
     // To compute "globalAvg" auto, but still enable json formatting
     def apply(id : Int,
@@ -26,9 +26,9 @@ object SurgeonStatisticsAutoAvg
               surgeryDurationAvgMinutes : Double,
               restingDurationAvgMinutes : Double,
               hospitalizationDurationAvgHours : Double
-             ) : SurgeonStatistics =
+             ) : DoctorStatistics =
     {
-        SurgeonStatistics(
+        DoctorStatistics(
             id,
             name,
             amountOfData,
