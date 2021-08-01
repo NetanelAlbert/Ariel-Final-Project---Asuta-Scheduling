@@ -1,6 +1,7 @@
 package model.database
 
 import model.DTOs.SurgeryStatistics
+import model.probability.IntegerDistribution
 import org.apache.commons.math3.distribution.EnumeratedIntegerDistribution
 import slick.jdbc.HsqldbProfile.api._
 import slick.jdbc.HsqldbProfile.backend.DatabaseDef
@@ -16,16 +17,19 @@ class SurgeryStatisticsSchema(tag: Tag) extends Table[SurgeryStatistics](tag, "S
     
     
     def operationCode = column[Double]("operationCode", O.PrimaryKey)
-
-    def restingDistribution = column[EnumeratedIntegerDistribution]("restingDistribution")
     
-    def hospitalizationDistribution = column[EnumeratedIntegerDistribution]("hospitalizationDistribution")
+    def operationName  = column[Option[String]]("operationName")
 
-    def profit = column[Double]("profit")
+    def restingDistribution = column[IntegerDistribution]("restingDistribution")
+    
+    def hospitalizationDistribution = column[IntegerDistribution]("hospitalizationDistribution")
+
+    def profit = column[Option[Double]]("profit")
 
     
     def columns = (
         operationCode,
+        operationName,
         restingDistribution,
         hospitalizationDistribution,
         profit
@@ -34,7 +38,7 @@ class SurgeryStatisticsSchema(tag: Tag) extends Table[SurgeryStatistics](tag, "S
     override def * = columns.mapTo[SurgeryStatistics]
 }
 
-class SurgeryStatisticsTable(m_db : DatabaseDef) extends TableQuery(new SurgeryStatisticsSchema(_))
+class SurgeryStatisticsTable(m_db : DatabaseDef) extends TableQuery(new SurgeryStatisticsSchema(_)) with BaseDB[SurgeryStatistics]
 {
     def create() : Future[Unit] =
     {
@@ -44,11 +48,6 @@ class SurgeryStatisticsTable(m_db : DatabaseDef) extends TableQuery(new SurgeryS
     def insert(element : SurgeryStatistics) : Future[Int] =
     {
         m_db.run(this += element)
-    }
-    
-    def insertAll(elements : Seq[SurgeryStatistics])  =
-    {
-        m_db.run(this ++= elements)
     }
     
     def selectAll() : Future[Seq[SurgeryStatistics]] =

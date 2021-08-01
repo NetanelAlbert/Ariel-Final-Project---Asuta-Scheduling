@@ -1,11 +1,12 @@
 package model.DTOs
 
-import org.apache.commons.math3.distribution.EnumeratedIntegerDistribution
+import model.probability.IntegerDistribution
 
 case class SurgeryStatistics
 (
     operationCode : Double,
-    restingDistribution : EnumeratedIntegerDistribution,
-    hospitalizationDistribution : EnumeratedIntegerDistribution,
-    profit : Double
+    operationName : Option[String],
+    restingDistribution : IntegerDistribution,
+    hospitalizationDistribution : IntegerDistribution,
+    profit : Option[Double]
 )

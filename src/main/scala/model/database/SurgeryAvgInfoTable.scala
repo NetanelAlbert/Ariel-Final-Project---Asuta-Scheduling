@@ -1,26 +1,20 @@
 package model.database
 
-import model.DTOs.DoctorStatistics
+import model.DTOs.{SurgeryAvgInfo}
 import slick.jdbc.HsqldbProfile.api._
+import slick.jdbc.HsqldbProfile.backend.DatabaseDef
 import slick.lifted.ProvenShape.proveShapeOf
 import slick.lifted.Tag
-import slick.jdbc.HsqldbProfile.backend.DatabaseDef
 
 import scala.concurrent.Future
 
 
-
-class DoctorStatisticsSchema(tag: Tag) extends Table[DoctorStatistics](tag, "DoctorStatistics")
+class SurgeryAvgInfoSchema(tag: Tag) extends Table[SurgeryAvgInfo](tag, "SurgeryAvgInfo")
 {
-    import model.DTOs.FormattingProtocols._
     
-    def id = column[Int]("id", O.PrimaryKey)
-    
-    def name = column[Option[String]]("name")
+    def operationCode = column[Double]("operationCode")
     
     def amountOfData = column[Int]("amountOfData")
-    
-    def profitAvg = column[Double]("profitAvg")
     
     def surgeryDurationAvgMinutes = column[Double]("surgeryDurationAvgMinutes")
     
@@ -28,34 +22,30 @@ class DoctorStatisticsSchema(tag: Tag) extends Table[DoctorStatistics](tag, "Doc
     
     def hospitalizationDurationAvgHours = column[Double]("hospitalizationDurationAvgHours")
     
-    def globalAvg = column[Double]("globalAvg")
-    
     def columns = (
-        id,
-        name,
+        operationCode,
         amountOfData,
-        profitAvg,
         surgeryDurationAvgMinutes,
         restingDurationAvgMinutes,
         hospitalizationDurationAvgHours,
-        globalAvg)
+    )
     
-    override def * = columns.mapTo[DoctorStatistics]
+    override def * = columns.mapTo[SurgeryAvgInfo]
 }
 
-class DoctorStatisticsTable(m_db : DatabaseDef) extends TableQuery(new DoctorStatisticsSchema(_)) with BaseDB[DoctorStatistics]
+class SurgeryAvgInfoTable(m_db : DatabaseDef) extends TableQuery(new SurgeryAvgInfoSchema(_)) with BaseDB[SurgeryAvgInfo]
 {
     def create() : Future[Unit] =
     {
         m_db.run(this.schema.createIfNotExists)
     }
     
-    def insert(element : DoctorStatistics) : Future[Int] =
+    def insert(element : SurgeryAvgInfo) : Future[Int] =
     {
         m_db.run(this += element)
     }
     
-    def selectAll() : Future[Seq[DoctorStatistics]] =
+    def selectAll() : Future[Seq[SurgeryAvgInfo]] =
     {
         m_db.run(this.result)
     }
@@ -63,5 +53,15 @@ class DoctorStatisticsTable(m_db : DatabaseDef) extends TableQuery(new DoctorSta
     def clear() : Future[Int] =
     {
         m_db.run(this.delete)
+    }
+    
+    def selectByOperationCode(opCode : Double) : Future[Option[SurgeryAvgInfo]] =
+    {
+        m_db.run(this.filter(_.operationCode === opCode).result.headOption)
+    }
+    
+    def selectByOperationCodes(opCodes : Seq[Double]) : Future[Seq[SurgeryAvgInfo]] =
+    {
+        m_db.run(this.filter(_.operationCode inSet opCodes).result)
     }
 }

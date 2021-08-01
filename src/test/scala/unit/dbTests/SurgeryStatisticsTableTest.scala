@@ -1,4 +1,4 @@
-package dbTests
+package unit.dbTests
 
 import model.DTOs.SurgeryStatistics
 import model.database.{DBConnection, SurgeryStatisticsTable}
@@ -8,6 +8,7 @@ import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 import scala.concurrent.ExecutionContext
 import scala.language.postfixOps
 import Utils._
+import model.probability.IntegerDistribution
 
 
 class SurgeryStatisticsTableTest extends FlatSpec with Matchers with BeforeAndAfterAll
@@ -18,9 +19,9 @@ class SurgeryStatisticsTableTest extends FlatSpec with Matchers with BeforeAndAf
     val table = new SurgeryStatisticsTable(db)
     
     val objects = List(
-        SurgeryStatistics(1.2, new EnumeratedIntegerDistribution(Array(1, 1, 2)), new EnumeratedIntegerDistribution(Array(3, 4, 5)), 122),
-        SurgeryStatistics(1.4, new EnumeratedIntegerDistribution(Array(2, 1, 2)), new EnumeratedIntegerDistribution(Array(3, 3, 3)), 159),
-        SurgeryStatistics(3.66, new EnumeratedIntegerDistribution(Array(5, 5, 9)), new EnumeratedIntegerDistribution(Array(6, 2, 1)), 72.4)
+        SurgeryStatistics(1.2, Some("aaa"), IntegerDistribution(Seq(1, 1, 2)), IntegerDistribution(Seq(3, 4, 5)), Some(122)),
+        SurgeryStatistics(1.4, Some("bbb"), IntegerDistribution(Seq(2, 1, 2)), IntegerDistribution(Seq(3, 3, 3)), Some(159)),
+        SurgeryStatistics(3.66, Some("ccc"), IntegerDistribution(Seq(5, 5, 9)), IntegerDistribution(Seq(6, 2, 1)), Some(72.4))
         )
     
     it should "initial table" in
@@ -39,7 +40,7 @@ class SurgeryStatisticsTableTest extends FlatSpec with Matchers with BeforeAndAf
     {
         val insertFuture = table.insertAll(objects)
         
-        waitFor(insertFuture) shouldEqual Some(objects.length)
+        waitFor(insertFuture) shouldEqual objects.length
     }
     
     it should "select the rows" in
@@ -47,8 +48,7 @@ class SurgeryStatisticsTableTest extends FlatSpec with Matchers with BeforeAndAf
         val allData = waitFor(table.selectAll())
     
         allData.length shouldBe objects.length
-        allData.head.restingDistribution.probability(1) shouldBe objects.head.restingDistribution.probability(1)
-        allData.last.hospitalizationDistribution.probability(3) shouldBe objects.last.hospitalizationDistribution.probability(3)
+        allData shouldBe objects
     }
     
     it should "clear the table" in

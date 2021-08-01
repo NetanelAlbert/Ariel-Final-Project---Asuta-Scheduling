@@ -1,4 +1,4 @@
-package dbTests
+package unit.dbTests
 
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 
@@ -11,12 +11,13 @@ import model.database.{DBConnection, DoctorStatisticsTable}
 
 class DoctorStatisticsTableTest extends FlatSpec with Matchers with BeforeAndAfterAll
 {
-    implicit val ec = ExecutionContext.global
+//    implicit val ec = ExecutionContext.global
+    import ExecutionContext.Implicits.global
     
     val db = DBConnection.get(test = true)
     val table = new DoctorStatisticsTable(db)
     
-    val objects = List(
+    val objects = List( // TODO HourOfWeek
         DoctorStatisticsAutoAvg(1, Some("David"), 450, 2.543, 6453.34, .3, 54.656),
         DoctorStatisticsAutoAvg(2, Some("Avi"), 99540, 4.5643, 6.3441, 3643.8, 11.3356),
         DoctorStatisticsAutoAvg(3, Some("Dan"), 451, 264.5, 613.3534, 33.782, 4.6)
@@ -38,7 +39,7 @@ class DoctorStatisticsTableTest extends FlatSpec with Matchers with BeforeAndAft
     {
         val insertFuture = table.insertAll(objects)
         
-        waitFor(insertFuture) shouldEqual Some(objects.length)
+        waitFor(insertFuture) shouldEqual objects.length
     }
     
     it should "select the rows" in
