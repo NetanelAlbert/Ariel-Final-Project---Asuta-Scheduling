@@ -1,6 +1,6 @@
 package model.probability
 
-trait RandomVariable[T]
+trait RandomVariable[T >: Int]
 {
     def support : Set[T]
     
@@ -10,7 +10,11 @@ trait RandomVariable[T]
     
     def cumulativePRangeExclude(begin : T, end : T) : Double
     
+    def cumulativePRangeExcludeEnd(begin : Int, end : Int) : Double
+    
     def expectation : Double
+    
+    def getMin : Int
     
     def + (that : RandomVariable[T]) : RandomVariable[T]
 }

@@ -1,67 +1,30 @@
 package model.liatAlgorithm
 
-import model.probability.IntegerDistribution
-
 object BellmanFord
 {
-    def initialize(distribution : IntegerDistribution, source : Int) =
+    def apply(graph : MutableGraph, length : Int, source : Int)
     {
-        val graph = new MutableGraph(distribution.support + Int.MaxValue)
-        val nodes = graph.vertices.toSeq.sorted
-        for (i <- nodes.indices)
-        {
-            val nodeI = nodes(i)
-            for (j <- i + 1 until nodes.size)
-            {
-                val nodeJ = nodes(j)
-                graph.connect(nodeI, nodeJ, distribution.cumulativePRangeExclude(nodeI, nodeJ))
-            }
-        }
-        graph.setDistance(source, 0)
-        graph
-    }
-    
-    
-    def bellman_ford(graph : MutableGraph, source : Int, length : Int) : Seq[Int] =
-    {
-        def relax(node : Int)
+        def relax(node : Int, k : Int)
         {
             for (ng <- graph.neighborsOf(node))
             {
-                val maxi = Math.max(graph.distanceOf(node), graph.weightOf(node, ng))
-                if (maxi < graph.distanceOf(ng))
+                val maxi = Math.max(graph.distanceOf(node, k-1), graph.weightOf(node, ng))
+                if (maxi < graph.distanceOf(ng, k))
                 {
-                    graph.setDistance(ng, maxi)
-                    graph.setParent(ng, node)
+                    graph.setDistance(ng, k, maxi)
+                    graph.setParent(ng, k, node)
                 }
             }
         }
         
-        //g = topological(g)
-        // todo - do we need topological? I think we will get the natural (numbering) order
-        val nodes = graph.vertices.toSeq.sorted
-        for (_ <- 1 to length; node <- nodes)
-        {
-            relax(node)
-        }
+        graph.resetNodes()
+        graph.setDistance(source, 0, 0)
         
+        val order = graph.topologicalOrder()
         
-        def traceFromSource(node : Int) : Seq[Int] =
+        for (i <- 1 to length ; node <- order)
         {
-            val parent = graph.parentOf(node)
-            parent match
-            {
-                case None => Seq(node)
-                case Some(num) => traceFromSource(num) :+ node
-            }
-        }
-        
-        val lastNode = graph.parentOf(Int.MaxValue)
-        lastNode match
-        {
-            case None => throw new RuntimeException("Infinity node is not reached")
-            case Some(num) => traceFromSource(num)
+            relax(node, i)
         }
     }
-    
 }

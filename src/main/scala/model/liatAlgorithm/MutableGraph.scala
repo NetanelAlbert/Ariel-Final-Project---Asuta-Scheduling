@@ -1,15 +1,18 @@
 package model.liatAlgorithm
 
+import model.probability.RandomVariable
+
 import java.awt.Color
+import scala.collection.convert.ImplicitConversions.`collection AsScalaIterable`
 import scala.collection.mutable
 
-class MutableGraph(nodes : Set[Int])
+class MutableGraph(nodes : Seq[Int])
 {
     private val m_nodes = new mutable.HashMap[Int, Node]() ++
         nodes.map(node => node -> Node(node))
     
     def this(){
-        this(Set())
+        this(Seq())
     }
     
     def += (num : Int)
@@ -21,7 +24,7 @@ class MutableGraph(nodes : Set[Int])
     
     def connect(src : Int, dest : Int, weight : Double)
     {
-        m_nodes(src).m_neighbors += dest -> Edge(src, dest, weight)
+        m_nodes(src).m_neighbors += dest -> weight
     }
     
     def isConnected(src : Int, dest : Int) =
@@ -29,9 +32,9 @@ class MutableGraph(nodes : Set[Int])
         m_nodes(src).m_neighbors.contains(dest)
     }
     
-    def weightOf(src : Int, dest : Int) =
+    def weightOf(src : Int, dest : Int) : Double =
     {
-        m_nodes(src).m_neighbors(dest).m_weight
+        m_nodes(src).m_neighbors(dest)
     }
     
     def neighborsOf(node : Int) =
@@ -39,31 +42,27 @@ class MutableGraph(nodes : Set[Int])
         m_nodes(node).m_neighbors.keySet
     }
     
-    def setParent(node : Int, parent : Int)
+    def setParent(node : Int, index :Int, parent : Int)
     {
         if(isConnected(parent, node))
-            m_nodes(node).m_parent = Some(parent)
+            m_nodes(node).m_parents(index) = parent
         else
             throw new RuntimeException("No such element: "+parent)
     }
-    def removeParent(node : Int)
+    
+    def parentOf(node : Int, index :Int) : Option[Int] =
     {
-        m_nodes(node).m_parent = None
+        m_nodes(node).m_parents.get(index)
     }
     
-    def parentOf(node : Int) =
+    def setDistance(node : Int, index :Int, distance : Double)
     {
-        m_nodes(node).m_parent
+            m_nodes(node).m_distances(index) = distance
     }
     
-    def setDistance(node : Int, distance : Double)
+    def distanceOf(node : Int, index :Int) : Double =
     {
-            m_nodes(node).m_distance = distance
-    }
-    
-    def distanceOf(node : Int) =
-    {
-        m_nodes(node).m_distance
+        m_nodes(node).m_distances.getOrElse(index, Double.PositiveInfinity)
     }
     
     def setState(node : Int, state : Color)
@@ -75,46 +74,82 @@ class MutableGraph(nodes : Set[Int])
     {
         m_nodes(node).m_state
     }
+    
+    def reset(node : Node)
+    {
+        node.m_parents.clear()
+        node.m_distances.clear()
+        node.m_state = Color.WHITE
+    }
+    
+    def resetNodes()
+    {
+        m_nodes.values.foreach(reset)
+    }
 
     /*
         todo - ask Liat why do we need this.
          We know how the graph will look like - and the order will be by the node number.
          because each number pointing to every number greater the it.
      */
-    def topologicalOrder() =
+    def topologicalOrder() : Seq[Int] =
     {
         val order = new java.util.ArrayDeque[Int](m_nodes.size)
-        // enter = set(graph)  todo translate
-        def dfs(node : Node)
+        val enter = vertices.to[mutable.Set]
+        
+        def dfs(node : Int)
         {
-            node.m_state = Color.GRAY
-            for(child <- node.m_neighbors.keySet)
+            setState(node, Color.GRAY)
+            for(child <- neighborsOf(node))
             {
                 val state = stateOf(child)
                 if(state == Color.GRAY)
                     throw new RuntimeException("There is a cycle")
-                if(state == Color.WHITE){
-                    //enter.discard(k) todo translate
-                    dfs(m_nodes(child))
+                if(state == Color.WHITE){ // same as != black
+                    enter.remove(child)
+                    dfs(child)
                 }
             }
-            order.addFirst(node.m_id)
-            node.m_state = Color.BLACK
+            order.addFirst(node)
+            setState(node, Color.BLACK)
         }
-        // while enter: dfs(enter.pop()) todo translate
-        order
+        
+        while (enter.nonEmpty)
+        {
+            val head = enter.head
+            dfs(head)
+            enter.remove(head)
+        }
+        
+        order.toSeq
     }
     
     private case class Node (m_id : Int) extends Ordered[Node]
     {
-        val m_neighbors = mutable.HashMap[Int, Edge]()
-        var m_parent : Option[Int] = None
-        var m_distance = Double.PositiveInfinity // or destination?
+        val m_neighbors = mutable.Map[Int, Double]() // (Node, weight)
+        val m_parents : mutable.Map[Int, Int] = mutable.Map()
+        val m_distances : mutable.Map[Int, Double] = mutable.Map() // or destination?
         var m_state = Color.WHITE
         
         // for the sort in the start of topological sort (maybe unnecessary)
         override def compare(that: Node) = this.m_neighbors.size compare that.m_neighbors.size
     }
     
-    private case class Edge (m_src : Int, m_dest : Int, m_weight : Double)
+}
+
+object MutableGraph
+{
+    def apply(prob : RandomVariable[Int]) : MutableGraph =
+    {
+        val nodes = prob.support.toSeq.sorted :+ Int.MaxValue
+        val graph = new MutableGraph(nodes)
+        
+        for(node <- nodes ; ng <- nodes.filter(node < _))
+        {
+            val weight = prob.cumulativePRangeExclude(node, ng)
+            graph.connect(node, ng, weight)
+        }
+        
+        graph
+    }
 }
