@@ -4,7 +4,7 @@ import akka.Done
 import akka.actor.ActorRef
 import model.DTOs.{DoctorStatistics, SurgeryAvgInfo, SurgeryAvgInfoByDoctor, SurgeryStatistics}
 import model.database._
-import work.{ReadPastSurgeriesExcelWork, WorkFailure, WorkSuccess}
+import work.{ReadDoctorsMappingExcelWork, ReadPastSurgeriesExcelWork, ReadSurgeryMappingExcelWork, WorkFailure, WorkSuccess}
 
 import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success}
@@ -22,8 +22,70 @@ class DatabaseActor(m_controller : ActorRef, m_modelManager : ActorRef)(implicit
     override def receive =
     {
         case work @ ReadPastSurgeriesExcelWork(_, _, Some(surgeryStatistics), Some(surgeryAvgInfo), Some(surgeryAvgInfoByDoctor), Some(doctorStatistics)) => readPastSurgeriesExcelWork(work, surgeryStatistics, surgeryAvgInfo, surgeryAvgInfoByDoctor, doctorStatistics)
-        
+
+        case work : ReadSurgeryMappingExcelWork => readSurgeryMappingExcelWork(work, work.surgeryMapping)
+
+        case work : ReadDoctorsMappingExcelWork => readDoctorMappingExcelWork(work, work.doctorMapping)
+
         case _ =>
+    }
+    
+    def readSurgeryMappingExcelWork(work : ReadSurgeryMappingExcelWork, surgeryMapping : Option[Map[Double, Option[String]]])
+    {
+        surgeryMapping match {
+            case Some(mapping) =>
+            {
+                surgeryStatisticsTable.setSurgeryNames(mapping).onComplete
+                {
+                    case Success(updated) =>
+                    {
+                        val info = s"Successfully mapped $updated surgeries in the database"
+                        m_controller ! WorkSuccess(work, Some(info))
+                    }
+    
+                    case Failure(exception) =>
+                    {
+                        val info = s"Was not able to update surgeryStatisticsTable with the new names"
+                        m_controller ! WorkFailure(work, Some(exception), Some(info))
+                    }
+                }
+            }
+    
+            case None =>
+            {
+                val info = s"Got ReadSurgeryMappingExcelWork with an empty map. work: $work"
+                m_controller ! WorkFailure(work, None, Some(info))
+            }
+        }
+    }
+    
+    def readDoctorMappingExcelWork(work : ReadDoctorsMappingExcelWork, doctorMapping : Option[Map[Int, Option[String]]])
+    {
+        doctorMapping match {
+            case Some(mapping) =>
+            {
+                doctorStatisticsTable.setDoctorNames(mapping).onComplete
+                {
+                    case Success(updated) =>
+                    {
+                        val info = s"Successfully mapped $updated doctors in the database"
+                        m_controller ! WorkSuccess(work, Some(info))
+                    }
+                    
+                    case Failure(exception) =>
+                    {
+                        val info = s"Was not able to update doctorStatisticsTable with the new names"
+                        m_controller ! WorkFailure(work, Some(exception), Some(info))
+                    }
+                }
+            }
+            
+            case None =>
+            {
+                val info = s"Got ReadDoctorsMappingExcelWork with an empty map. work: $work"
+                m_controller ! WorkFailure(work, None, Some(info))
+            }
+        }
     }
     
     def readPastSurgeriesExcelWork(work : ReadPastSurgeriesExcelWork, surgeryStatistics : Iterable[SurgeryStatistics], surgeryAvgInfo : Iterable[SurgeryAvgInfo], surgeryAvgInfoByDoctor : Iterable[SurgeryAvgInfoByDoctor], doctorStatistics : Iterable[DoctorStatistics])
@@ -81,7 +143,7 @@ class DatabaseActor(m_controller : ActorRef, m_modelManager : ActorRef)(implicit
         {
             case Success(_) =>
             {
-                m_controller ! WorkSuccess(work)
+                m_controller ! WorkSuccess(work, Some(s"Successfully load surgery data from ${work.filePath}"))
             }
     
             case Failure(exception) =>

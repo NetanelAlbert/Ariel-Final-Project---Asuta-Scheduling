@@ -17,11 +17,12 @@ case class ReadPastSurgeriesExcelWork
     doctorStatistics : Option[Iterable[DoctorStatistics]] = None,
 ) extends FileWork
 
-case class ReadProfitExcelWork(filePath : String) extends FileWork
+case class ReadSurgeryMappingExcelWork(filePath : String, surgeryMapping : Option[Map[Double, Option[String]]]) extends FileWork
 
-case class ReadDoctorsMappingExcelWork(filePath : String) extends FileWork
+case class ReadDoctorsMappingExcelWork(filePath : String, doctorMapping : Option[Map[Int, Option[String]]]) extends FileWork
 
-case class ReadSurgeryMappingExcelWork(filePath : String) extends FileWork
 
 
 case class ReadFutureSurgeriesExcelWork(filePath : String) extends FileWork
+
+case class ReadProfitExcelWork(filePath : String) extends FileWork

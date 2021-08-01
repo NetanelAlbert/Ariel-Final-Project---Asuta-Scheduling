@@ -11,7 +11,7 @@ import java.io.PrintWriter
 import collection.JavaConversions._
 import model.DTOs.FormattingProtocols._
 import model.DTOs.{DoctorStatistics, PastSurgeryInfo}
-import work.{ReadPastSurgeriesExcelWork, WorkFailure}
+import work.{ReadDoctorsMappingExcelWork, ReadPastSurgeriesExcelWork, ReadSurgeryMappingExcelWork, WorkFailure}
 
 import java.sql.{Date, Timestamp}
 import java.util.concurrent.TimeUnit
@@ -21,6 +21,7 @@ import scala.util.{Failure, Success, Try}
 
 class FileActor(m_controller : ActorRef,
                 m_modelManager : ActorRef,
+                m_databaseActor : ActorRef,
                 m_AnalyzeDataActor : ActorRef)(implicit ec : ExecutionContext) extends MyActor
 {
     
@@ -28,7 +29,62 @@ class FileActor(m_controller : ActorRef,
     {
         case work : ReadPastSurgeriesExcelWork => readPastSurgeriesExcelWork(work, work.filePath)
         
+        case work : ReadSurgeryMappingExcelWork => readSurgeryMappingExcelWork(work, work.filePath)
+        
+        case work : ReadDoctorsMappingExcelWork => readDoctorMappingExcelWork(work, work.filePath)
+        
         case _ =>
+    }
+    
+    def readSurgeryMappingExcelWork(work : ReadSurgeryMappingExcelWork, filePath : String)
+    {
+        implicit val formatter = new DataFormatter()
+        val surgeryMapping = getSheet(filePath).flatMap(getDoubleStringFromRow(_)).toMap
+        
+        if(surgeryMapping.nonEmpty)
+        {
+            m_databaseActor ! work.copy(surgeryMapping = Some(surgeryMapping))
+        }else
+        {
+            val info = "Surgery mapping file must have ID (real number) in the first column, and name on the second"
+            m_controller ! WorkFailure(work, None, Some(info))
+        }
+    }
+    
+    def getDoubleStringFromRow(row : Row)(implicit formatter: DataFormatter) : Option[(Double, Option[String])] =
+    {
+        Try
+        {
+            val operationCode = formatter.formatCellValue(row.getCell(0)).toDouble
+            val name = formatter.formatCellValue(row.getCell(1))
+            (operationCode, Some(name))
+        }.toOption
+    }
+    
+    def readDoctorMappingExcelWork(work : ReadDoctorsMappingExcelWork, filePath : String)
+    {
+        implicit val formatter = new DataFormatter()
+        val doctorMapping = getSheet(filePath).flatMap(getIntStringFromRow(_)).toMap
+        
+        if(doctorMapping.nonEmpty)
+        {
+            m_databaseActor ! work.copy(doctorMapping = Some(doctorMapping))
+        } else
+        {
+            val info = "Doctor mapping file must have ID (natural number) in the first column, and name on the second"
+            m_controller ! WorkFailure(work, None, Some(info))
+        }
+        
+    }
+    
+    def getIntStringFromRow(row : Row)(implicit formatter: DataFormatter) : Option[(Int, Option[String])] =
+    {
+        Try
+        {
+            val operationCode = formatter.formatCellValue(row.getCell(0)).toInt
+            val name = formatter.formatCellValue(row.getCell(1))
+            (operationCode, Some(name))
+        }.toOption
     }
     
     def readPastSurgeriesExcelWork(readPastSurgeriesExcelWork : ReadPastSurgeriesExcelWork, filePath : String)
@@ -47,6 +103,8 @@ class FileActor(m_controller : ActorRef,
             }
         }
     }
+    
+    
     
     def getAllPastSurgeryFromExcel(path : String) : Future[Iterable[PastSurgeryInfo]] =
     {
@@ -109,9 +167,7 @@ class FileActor(m_controller : ActorRef,
         val blockEndIndex = 28
     }
     
-    
-    val SURGEON_STATISTICS_JSON_PATH = "SURGEON_STATISTICS"
-    
+    //TODO :: handle fail? maybe validate file on UI?
     def getSheet(path : String, index : Int = 0) : Sheet =
     {
         val file = new File(path)
@@ -119,7 +175,10 @@ class FileActor(m_controller : ActorRef,
         workbook.getSheetAt(index)
     }
     
+    
     //json files operations
+    
+//    val SURGEON_STATISTICS_JSON_PATH = "SURGEON_STATISTICS"
 //    //TODO :: handle fail?
 //    def saveJsonToFile(jsValue : JsValue, path : String)
 //    {
