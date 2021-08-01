@@ -8,7 +8,7 @@ import slick.jdbc.HsqldbProfile.backend.DatabaseDef
 import slick.lifted.ProvenShape.proveShapeOf
 import slick.lifted.Tag
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 
 class SurgeryStatisticsSchema(tag: Tag) extends Table[SurgeryStatistics](tag, "SurgeryStatistics")
@@ -38,7 +38,7 @@ class SurgeryStatisticsSchema(tag: Tag) extends Table[SurgeryStatistics](tag, "S
     override def * = columns.mapTo[SurgeryStatistics]
 }
 
-class SurgeryStatisticsTable(m_db : DatabaseDef) extends TableQuery(new SurgeryStatisticsSchema(_)) with BaseDB[SurgeryStatistics]
+class SurgeryStatisticsTable(m_db : DatabaseDef)(implicit ec : ExecutionContext) extends TableQuery(new SurgeryStatisticsSchema(_)) with BaseDB[SurgeryStatistics]
 {
     def create() : Future[Unit] =
     {
@@ -53,6 +53,26 @@ class SurgeryStatisticsTable(m_db : DatabaseDef) extends TableQuery(new SurgeryS
     def selectAll() : Future[Seq[SurgeryStatistics]] =
     {
         m_db.run(this.result)
+    }
+    
+    def getSurgeryMapping() : Future[Map[Double, Option[String]]] =
+    {
+        m_db.run(this.map(row => (row.operationCode, row.operationName)).result)
+            .map(_.filter(_._2.nonEmpty).toMap)
+    }
+    
+    def setSurgeryNames(surgeryMapping : Map[Double, Option[String]]) : Future[Int] =
+    {
+        val updates = surgeryMapping.map
+        {
+            case (operationCode, operationName) =>
+            {
+                this.filter(_.operationCode === operationCode)
+                    .map(_.operationName).update(operationName)
+            }
+        }
+        
+        m_db.run(DBIO.sequence(updates)).map(_.sum)
     }
     
     def clear() : Future[Int] =

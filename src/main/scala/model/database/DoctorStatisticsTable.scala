@@ -6,7 +6,7 @@ import slick.lifted.ProvenShape.proveShapeOf
 import slick.lifted.Tag
 import slick.jdbc.HsqldbProfile.backend.DatabaseDef
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 
 
@@ -43,7 +43,7 @@ class DoctorStatisticsSchema(tag: Tag) extends Table[DoctorStatistics](tag, "Doc
     override def * = columns.mapTo[DoctorStatistics]
 }
 
-class DoctorStatisticsTable(m_db : DatabaseDef) extends TableQuery(new DoctorStatisticsSchema(_)) with BaseDB[DoctorStatistics]
+class DoctorStatisticsTable(m_db : DatabaseDef)(implicit ec : ExecutionContext) extends TableQuery(new DoctorStatisticsSchema(_)) with BaseDB[DoctorStatistics]
 {
     def create() : Future[Unit] =
     {
@@ -58,6 +58,25 @@ class DoctorStatisticsTable(m_db : DatabaseDef) extends TableQuery(new DoctorSta
     def selectAll() : Future[Seq[DoctorStatistics]] =
     {
         m_db.run(this.result)
+    }
+    
+    def getDoctorMapping() : Future[Map[Int, Option[String]]] =
+    {
+        m_db.run(this.map(row => (row.id, row.name)).result)
+            .map(_.filter(_._2.nonEmpty).toMap)
+    }
+    
+    def setDoctorNames(doctorMapping : Map[Int, Option[String]]) : Future[Int] =
+    {
+        val updates = doctorMapping.map
+        {
+            case (id, name) =>
+            {
+                this.filter(_.id === id).map(_.name).update(name)
+            }
+        }
+        
+        m_db.run(DBIO.sequence(updates)).map(_.sum)
     }
     
     def clear() : Future[Int] =

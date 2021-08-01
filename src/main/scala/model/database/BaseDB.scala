@@ -8,7 +8,7 @@ trait BaseDB[T]
     
     def insert(element : T) : Future[Int]
     
-    def insertAll(elements : Seq[T]) : Future[Int] =
+    def insertAll(elements : Iterable[T]) : Future[Int] =
     {
         import scala.concurrent.ExecutionContext.Implicits.global
         val insertFutureSeq = elements.map(insert)

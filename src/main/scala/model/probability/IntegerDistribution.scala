@@ -101,9 +101,9 @@ case class IntegerDistribution(m_distribution: Map[Int, Double]) extends RandomV
 
 object IntegerDistribution
 {
-    def apply(data : Seq[Int]) : IntegerDistribution =
+    def apply(data : Iterable[Int]) : IntegerDistribution =
     {
-        val distribution = data.groupBy(identity).mapValues(_.size*1.0/data.size)
+        val distribution = data.groupBy(identity).mapValues(_.size.toDouble/data.size)
         new IntegerDistribution(distribution)
     }
     
