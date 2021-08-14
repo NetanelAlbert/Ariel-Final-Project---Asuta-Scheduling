@@ -1,30 +1,40 @@
 package model.actors
 
 
-import akka.actor.{Actor, ActorRef}
-import org.apache.poi.ss.usermodel.{DataFormatter, Row}
-import model.DTOs.{DoctorStatistics, DoctorStatisticsAutoAvg, PastSurgeryInfo, SurgeryAvgInfo, SurgeryAvgInfoByDoctor, SurgeryStatistics}
+import akka.actor.{ActorRef, Props}
+import model.DTOs.{DoctorAvailability, DoctorStatistics, DoctorStatisticsAutoAvg, PastSurgeryInfo, SurgeryAvgInfo, SurgeryAvgInfoByDoctor, SurgeryStatistics}
 import model.probability.IntegerDistribution
-import org.apache.commons.math3.distribution.EnumeratedIntegerDistribution
-import work.{ReadPastSurgeriesExcelWork, WorkFailure}
+import work.{GetOptionsForFreeBlockWork, ReadPastSurgeriesExcelWork, WorkFailure}
 
-import java.sql.Timestamp
-import java.util.concurrent.TimeUnit
-import scala.collection.convert.ImplicitConversions.`iterable AsScalaIterable`
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
+object AnalyzeDataActor
+{
+    def props(m_controller : ActorRef, m_modelManager : ActorRef, m_databaseActor : ActorRef)(implicit ec : ExecutionContext) : Props = Props(new AnalyzeDataActor(m_controller, m_modelManager, m_databaseActor))
+}
+
 class AnalyzeDataActor(m_controller : ActorRef,
-                       m_databaseActor : ActorRef,
-                       m_modelManager : ActorRef)(implicit c : ExecutionContext) extends MyActor
+                       m_modelManager : ActorRef,
+                       m_databaseActor : ActorRef)(implicit c : ExecutionContext) extends MyActor
 {
     
     override def receive =
     {
         case work : ReadPastSurgeriesExcelWork => readPastSurgeriesExcelWork(work, work.pasteSurgeries)
+
+        case work : GetOptionsForFreeBlockWork => getOptionsForFreeBlockWork(work)
+    }
+    
+    def getOptionsForFreeBlockWork(work : GetOptionsForFreeBlockWork) = ??? // TODO Implement
     
     
-        case _ =>
+    def getDoctorAvailability(pasteSurgeries : Iterable[PastSurgeryInfo]) : Future[Set[DoctorAvailability]] =
+    {
+        Future
+        {
+            pasteSurgeries.map(surgery => DoctorAvailability(surgery.doctorId, surgery.blockStart.getDayOfWeek)).toSet
+        }
     }
     
     def readPastSurgeriesExcelWork(readPastSurgeriesExcelWork : ReadPastSurgeriesExcelWork, pasteSurgeriesOption : Option[Iterable[PastSurgeryInfo]]) = pasteSurgeriesOption match
@@ -41,22 +51,25 @@ class AnalyzeDataActor(m_controller : ActorRef,
             val surgeryAvgInfoIterableFuture = getSurgeryAvgInfo(pasteSurgeries)
             val surgeryAvgInfoByDoctorIterableFuture = getSurgeryAvgInfoByDoctor(pasteSurgeries)
             val doctorStatisticsIterableFuture = getDoctorStatistics(pasteSurgeries)
+            val doctorAvailabilitiesFuture = getDoctorAvailability(pasteSurgeries)
             
-            val copyFuture = for
+            val copyWorkFuture = for
             {
                 surgeryStatisticsIterable <- surgeryStatisticsIterableFuture
                 surgeryAvgInfoIterable <- surgeryAvgInfoIterableFuture
                 surgeryAvgInfoByDoctorIterable <- surgeryAvgInfoByDoctorIterableFuture
                 doctorStatisticsIterable <- doctorStatisticsIterableFuture
+                doctorAvailabilities <- doctorAvailabilitiesFuture
             } yield readPastSurgeriesExcelWork.copy(
                 surgeryStatistics = Some(surgeryStatisticsIterable),
                 surgeryAvgInfo = Some(surgeryAvgInfoIterable),
                 surgeryAvgInfoByDoctor = Some(surgeryAvgInfoByDoctorIterable),
                 doctorStatistics = Some(doctorStatisticsIterable),
+                doctorAvailabilities = Some(doctorAvailabilities),
                 pasteSurgeries = None
-            )
+                )
             
-            copyFuture.onComplete
+            copyWorkFuture.onComplete
             {
                 case Success(workCopy) => m_databaseActor ! workCopy
     

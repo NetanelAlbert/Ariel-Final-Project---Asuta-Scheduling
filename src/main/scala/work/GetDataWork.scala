@@ -1,6 +1,6 @@
 package work
 
-import model.DTOs.{DoctorStatistics, SurgeryAvgInfo, SurgeryAvgInfoByDoctor, SurgeryBasicInfo}
+import model.DTOs.{DoctorStatistics, SurgeryAvgInfo, SurgeryAvgInfoByDoctor, SurgeryBasicInfo, SurgeryStatistics}
 import model.probability.IntegerDistribution
 
 import java.util.Date
@@ -18,8 +18,11 @@ case class GetOptionsForFreeBlockWork
 (
     startTime : Date,
     endTime : Date,
-    predictedCurrentRestingDistribution : Option[IntegerDistribution] = None,
-    predictedCurrentHospitalizationDistribution : Option[IntegerDistribution] = None,
+    dayOfWeek: Int,
+    optionalDoctorsWithSurgeries : Option[Map[Int, Seq[Double]]],
+    surgeryStatistics: Option[Seq[SurgeryStatistics]],
+    currentRestingDistribution : Option[IntegerDistribution] = None,
+    currentHospitalizationDistribution : Option[IntegerDistribution] = None,
     topOptions : Option[Seq[BlockFillingOption]] = None,
 ) extends GetDataWork
 
@@ -28,8 +31,7 @@ case class BlockFillingOption
     doctorId : Double,
     doctorName : Option[String],
     surgeries : Seq[SurgeryBasicInfo],
-    predictedRestingDistribution : Option[IntegerDistribution] = None,
-    predictedHospitalizationDistribution : Option[IntegerDistribution] = None,
+   
     // TODO find out the relevant fields
 )
 

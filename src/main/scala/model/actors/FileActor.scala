@@ -4,13 +4,14 @@ import org.apache.poi.ss.usermodel.{DataFormatter, Row, Sheet, WorkbookFactory}
 import spray.json.DefaultJsonProtocol
 import spray.json._
 import DefaultJsonProtocol._
-import akka.actor.{Actor, ActorRef}
+import akka.actor.{Actor, ActorRef, Props}
 
 import java.io.File
 import java.io.PrintWriter
 import collection.JavaConversions._
 import model.DTOs.FormattingProtocols._
 import model.DTOs.{DoctorStatistics, PastSurgeryInfo}
+import org.joda.time.LocalDate
 import work.{ReadDoctorsMappingExcelWork, ReadPastSurgeriesExcelWork, ReadSurgeryMappingExcelWork, WorkFailure}
 
 import java.sql.{Date, Timestamp}
@@ -18,6 +19,10 @@ import java.util.concurrent.TimeUnit
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
+object FileActor
+{
+    def props(m_controller : ActorRef, m_modelManager : ActorRef, m_databaseActor : ActorRef, m_AnalyzeDataActor : ActorRef)(implicit ec : ExecutionContext) : Props = Props(new FileActor(m_controller, m_modelManager, m_databaseActor, m_AnalyzeDataActor))
+}
 
 class FileActor(m_controller : ActorRef,
                 m_modelManager : ActorRef,
@@ -32,8 +37,6 @@ class FileActor(m_controller : ActorRef,
         case work : ReadSurgeryMappingExcelWork => readSurgeryMappingExcelWork(work, work.filePath)
         
         case work : ReadDoctorsMappingExcelWork => readDoctorMappingExcelWork(work, work.filePath)
-        
-        case _ =>
     }
     
     def readSurgeryMappingExcelWork(work : ReadSurgeryMappingExcelWork, filePath : String)
@@ -129,9 +132,9 @@ class FileActor(m_controller : ActorRef,
             val hospitalizationHours = dateDiff(row, restingStartIndex, restingEndIndex, TimeUnit.MINUTES)
         
             val blockStartString = formatter.formatCellValue(row.getCell(blockStartIndex))
-            val blockStart = new Timestamp(sdFormat.parse(blockStartString).getTime)
+            val blockStart = new LocalDate(sdFormat.parse(blockStartString).getTime)
             val blockEndString = formatter.formatCellValue(row.getCell(blockEndIndex))
-            val blockEnd = new Timestamp(sdFormat.parse(blockEndString).getTime)
+            val blockEnd = new LocalDate(sdFormat.parse(blockEndString).getTime)
         
             PastSurgeryInfo(operationCode,
                             doctorId,

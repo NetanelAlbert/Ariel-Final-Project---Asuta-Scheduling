@@ -2,6 +2,7 @@ package model.DTOs
 
 import model.probability.IntegerDistribution
 import org.apache.commons.math3.distribution.EnumeratedIntegerDistribution
+import org.joda.time.{Days, LocalTime}
 
 import java.io.{ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream}
 import java.sql.Blob
@@ -21,20 +22,13 @@ object FormattingProtocols
         mapString => new IntegerDistribution(mapString.toJson.convertTo[List[(Int, Double)]].toMap)
     )
     
+    implicit val DaysMapping = MappedColumnType.base[Days, Int](
+        day => day.getDays,
+        int => Days.days(int))
+     
+    implicit val LocalTimeMapping = MappedColumnType.base[LocalTime, Int](
+        time => 60 * time.getHourOfDay + time.getMinuteOfHour,
+        minutes => new LocalTime(minutes / 60, minutes % 60))
     
     
-//    implicit val EnumeratedIntegerDistributionMapper = MappedColumnType.base[EnumeratedIntegerDistribution, Blob](
-//        distribution =>
-//        {
-//            val b = new ByteArrayOutputStream
-//            val out = new ObjectOutputStream(b)
-//            out.writeObject(distribution)
-//            out.flush()
-//            new SerialBlob(b.toByteArray)
-//        },
-//        blob =>
-//        {
-//            val in = new ObjectInputStream(blob.getBinaryStream)
-//            in.readObject().asInstanceOf[EnumeratedIntegerDistribution]
-//        })
 }

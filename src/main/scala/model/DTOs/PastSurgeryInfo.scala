@@ -1,5 +1,7 @@
 package model.DTOs
 
+import org.joda.time.LocalDate
+
 import java.sql.Timestamp
 
 case class PastSurgeryInfo
@@ -9,6 +11,6 @@ case class PastSurgeryInfo
     surgeryDurationMinutes : Int,
     restingMinutes : Int,
     hospitalizationHours : Int,
-    blockStart : Timestamp,
-    blockEnd : Timestamp
+    blockStart : LocalDate,
+    blockEnd : LocalDate
 )

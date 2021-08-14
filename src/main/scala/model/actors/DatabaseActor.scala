@@ -1,13 +1,18 @@
 package model.actors
 
 import akka.Done
-import akka.actor.ActorRef
-import model.DTOs.{DoctorStatistics, SurgeryAvgInfo, SurgeryAvgInfoByDoctor, SurgeryStatistics}
+import akka.actor.{ActorRef, Props}
+import model.DTOs.{DoctorAvailability, DoctorStatistics, SurgeryAvgInfo, SurgeryAvgInfoByDoctor, SurgeryStatistics}
 import model.database._
-import work.{ReadDoctorsMappingExcelWork, ReadPastSurgeriesExcelWork, ReadSurgeryMappingExcelWork, WorkFailure, WorkSuccess}
+import work.{GetDoctorsStatisticsWork, GetOptionsForFreeBlockWork, ReadDoctorsMappingExcelWork, ReadPastSurgeriesExcelWork, ReadSurgeryMappingExcelWork, WorkFailure, WorkSuccess}
 
 import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success}
+
+object DatabaseActor
+{
+    def props(m_controller : ActorRef, m_modelManager : ActorRef)(implicit ec : ExecutionContext) : Props = Props(new DatabaseActor(m_controller, m_modelManager))
+}
 
 class DatabaseActor(m_controller : ActorRef, m_modelManager : ActorRef)(implicit ec : ExecutionContext) extends MyActor
 {
@@ -17,17 +22,63 @@ class DatabaseActor(m_controller : ActorRef, m_modelManager : ActorRef)(implicit
     val surgeryAvgInfoTable = new SurgeryAvgInfoTable(m_db)
     val surgeryAvgInfoByDoctorTable = new SurgeryAvgInfoByDoctorTable(m_db)
     val doctorStatisticsTable = new DoctorStatisticsTable(m_db)
+    val doctorAvailabilityTable = new DoctorAvailabilityTable(m_db)
     
+    override def preStart()
+    {
+        super.preStart()
+    
+        surgeryStatisticsTable.create()
+        surgeryAvgInfoTable.create()
+        surgeryAvgInfoByDoctorTable.create()
+        doctorStatisticsTable.create()
+        doctorAvailabilityTable.create()
+    }
     
     override def receive =
     {
-        case work @ ReadPastSurgeriesExcelWork(_, _, Some(surgeryStatistics), Some(surgeryAvgInfo), Some(surgeryAvgInfoByDoctor), Some(doctorStatistics)) => readPastSurgeriesExcelWork(work, surgeryStatistics, surgeryAvgInfo, surgeryAvgInfoByDoctor, doctorStatistics)
+        case work @ ReadPastSurgeriesExcelWork(_, _, Some(surgeryStatistics), Some(surgeryAvgInfo), Some(surgeryAvgInfoByDoctor), Some(doctorStatistics), Some(doctorAvailabilities)) =>
+        {
+            readPastSurgeriesExcelWork(work, surgeryStatistics, surgeryAvgInfo, surgeryAvgInfoByDoctor, doctorStatistics, doctorAvailabilities)
+        }
 
         case work : ReadSurgeryMappingExcelWork => readSurgeryMappingExcelWork(work, work.surgeryMapping)
 
         case work : ReadDoctorsMappingExcelWork => readDoctorMappingExcelWork(work, work.doctorMapping)
 
-        case _ =>
+        case work : GetDoctorsStatisticsWork => getDoctorsStatisticsWork(work)
+        
+        case work : GetOptionsForFreeBlockWork => getOptionsForFreeBlockWork(work, work.dayOfWeek)
+    }
+    
+    def getOptionsForFreeBlockWork(work : GetOptionsForFreeBlockWork, dayOfWeek : Int) = ??? // TODO Implement
+    
+    def getDoctorsStatisticsWork(work : GetDoctorsStatisticsWork)
+    {
+        val doctorsBaseStatisticsFuture = doctorStatisticsTable.selectAll()
+        val surgeryAvgInfoByDoctorMapFuture = surgeryAvgInfoByDoctorTable.selectAll()
+        val surgeryAvgInfoListFuture = surgeryAvgInfoTable.selectAll()
+        val workCopyFuture = for
+        {
+            doctorsBaseStatistics <- doctorsBaseStatisticsFuture
+            surgeryAvgInfoByDoctor <- surgeryAvgInfoByDoctorMapFuture
+            surgeryAvgInfoList <- surgeryAvgInfoListFuture
+        } yield work.copy(
+            doctorsBaseStatistics = Some(doctorsBaseStatistics),
+            surgeryAvgInfoByDoctorMap = Some(surgeryAvgInfoByDoctor.groupBy(_.doctorId)),
+            surgeryAvgInfoList = Some(surgeryAvgInfoList)
+        )
+        
+        workCopyFuture.onComplete
+        {
+            case Success(workCopy) => m_controller ! WorkSuccess(workCopy, Some(""))
+
+            case Failure(exception) =>
+            {
+                val info = s"Was not able to get doctors statistics from DB"
+                m_controller ! WorkFailure(work, Some(exception), Some(info))
+            }
+        }
     }
     
     def readSurgeryMappingExcelWork(work : ReadSurgeryMappingExcelWork, surgeryMapping : Option[Map[Double, Option[String]]])
@@ -88,7 +139,7 @@ class DatabaseActor(m_controller : ActorRef, m_modelManager : ActorRef)(implicit
         }
     }
     
-    def readPastSurgeriesExcelWork(work : ReadPastSurgeriesExcelWork, surgeryStatistics : Iterable[SurgeryStatistics], surgeryAvgInfo : Iterable[SurgeryAvgInfo], surgeryAvgInfoByDoctor : Iterable[SurgeryAvgInfoByDoctor], doctorStatistics : Iterable[DoctorStatistics])
+    def readPastSurgeriesExcelWork(work : ReadPastSurgeriesExcelWork, surgeryStatistics : Iterable[SurgeryStatistics], surgeryAvgInfo : Iterable[SurgeryAvgInfo], surgeryAvgInfoByDoctor : Iterable[SurgeryAvgInfoByDoctor], doctorStatistics : Iterable[DoctorStatistics], doctorAvailabilities : Set[DoctorAvailability])
     {
         val mappings = for
         {
@@ -102,6 +153,7 @@ class DatabaseActor(m_controller : ActorRef, m_modelManager : ActorRef)(implicit
             val surgeryAvgInfo = surgeryAvgInfoTable.clear()
             val surgeryAvgInfoByDoctor = surgeryAvgInfoByDoctorTable.clear()
             val doctorStatistics = doctorStatisticsTable.clear()
+            val doctorAvailabilities = doctorAvailabilityTable.clear()
             
             for
             {
@@ -109,6 +161,7 @@ class DatabaseActor(m_controller : ActorRef, m_modelManager : ActorRef)(implicit
                 _ <- surgeryAvgInfo
                 _ <- surgeryAvgInfoByDoctor
                 _ <- doctorStatistics
+                _ <- doctorAvailabilities
             } yield Done.done()
         })
         
@@ -118,6 +171,7 @@ class DatabaseActor(m_controller : ActorRef, m_modelManager : ActorRef)(implicit
             val surgeryAvgInfoFuture = surgeryAvgInfoTable.insertAll(surgeryAvgInfo)
             val surgeryAvgInfoByDoctorFuture = surgeryAvgInfoByDoctorTable.insertAll(surgeryAvgInfoByDoctor)
             val doctorStatisticsFuture = doctorStatisticsTable.insertAll(doctorStatistics)
+            val doctorAvailabilitiesFuture = doctorAvailabilityTable.insertAll(doctorAvailabilities)
     
             for
             {
@@ -125,6 +179,7 @@ class DatabaseActor(m_controller : ActorRef, m_modelManager : ActorRef)(implicit
                 _ <- surgeryAvgInfoFuture
                 _ <- surgeryAvgInfoByDoctorFuture
                 _ <- doctorStatisticsFuture
+                _ <- doctorAvailabilitiesFuture
             } yield Done.done()
         })
         

@@ -53,6 +53,11 @@ class SurgeryAvgInfoByDoctorTable(m_db : DatabaseDef) extends TableQuery(new Sur
         m_db.run(this.result)
     }
     
+    def getSurgeriesByDoctor(doctorID : Int) : Future[Seq[Double]] =
+    {
+        m_db.run(this.filter(_.doctorId === doctorID).map(_.operationCode).result)
+    }
+    
     def clear() : Future[Int] =
     {
         m_db.run(this.delete)

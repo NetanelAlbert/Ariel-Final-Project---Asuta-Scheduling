@@ -87,7 +87,7 @@ case class IntegerDistribution(m_distribution: Map[Int, Double]) extends RandomV
      */
     override def +(that : RandomVariable[Int]) : IntegerDistribution =
     {
-        val map = mutable.Map[Int, Double]()
+        val map = mutable.HashMap[Int, Double]()
         for(v1 <- support ; v2 <- that.support)
         {
             val v = v1 + v2

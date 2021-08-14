@@ -11,6 +11,9 @@ case class DoctorStatistics
     hospitalizationDurationAvgHours : Double,
     globalAvg : Double
 )
+{
+    def nameOrId : String = name.getOrElse(s"$id (id)")
+}
 
 object DoctorStatistics
 {

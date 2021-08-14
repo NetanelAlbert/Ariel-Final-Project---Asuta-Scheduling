@@ -1,6 +1,7 @@
 package work
 
-import model.DTOs.{DoctorStatistics, PastSurgeryInfo, SurgeryAvgInfo, SurgeryAvgInfoByDoctor, SurgeryStatistics}
+import model.DTOs.{DoctorAvailability, DoctorStatistics, PastSurgeryInfo, SurgeryAvgInfo, SurgeryAvgInfoByDoctor, SurgeryStatistics}
+import org.joda.time.Days
 
 trait FileWork extends Work
 {
@@ -15,6 +16,7 @@ case class ReadPastSurgeriesExcelWork
     surgeryAvgInfo : Option[Iterable[SurgeryAvgInfo]] = None,
     surgeryAvgInfoByDoctor : Option[Iterable[SurgeryAvgInfoByDoctor]] = None,
     doctorStatistics : Option[Iterable[DoctorStatistics]] = None,
+    doctorAvailabilities : Option[Set[DoctorAvailability]] = None
 ) extends FileWork
 
 case class ReadSurgeryMappingExcelWork(filePath : String, surgeryMapping : Option[Map[Double, Option[String]]]) extends FileWork

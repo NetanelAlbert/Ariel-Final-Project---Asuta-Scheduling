@@ -1,11 +1,11 @@
 package model.DTOs
 
-import java.util.Date
+import org.joda.time.LocalDate
 
 case class FutureSurgeryInfo
 (
     operationCode : Double,
     doctorId : Int,
-    surgeryFinishTime : Date,
+    surgeryFinishTime : LocalDate,
 )
 
