@@ -4,33 +4,24 @@ import javafx.event.{ActionEvent, EventHandler}
 import scalafx.scene.control.{Menu, MenuBar, MenuItem, RadioMenuItem, ToggleGroup}
 import scalafx.stage.Screen
 
-class ManagerMenu(loadCurrentScheduleListener : EventHandler[ActionEvent],
-                  loadPastSurgeriesListener : EventHandler[ActionEvent],
-                  loadProfitListener : EventHandler[ActionEvent],
-                  loadDoctorsIDMappingListener : EventHandler[ActionEvent],
-                  loadSurgeryIDMappingListener : EventHandler[ActionEvent],
-
-                  radioBasicInformationListener : EventHandler[ActionEvent],
-                  radioImprovementInformationAverageListener : EventHandler[ActionEvent],
-                  radioImprovementInformationByOperationListener : EventHandler[ActionEvent],
-                 ) extends MenuBar
+class ManagerMenu extends MenuBar
 {
     val fileMenu = new Menu("File")
     
     val loadDataMenu = new Menu("Load Data")
-    loadDataMenu.items = List(menuItem("Current Schedule", loadCurrentScheduleListener),
-                              menuItem("Past Surgeries", loadPastSurgeriesListener),
-                              menuItem("Profit", loadProfitListener),
-                              menuItem("Doctors ID Mapping", loadDoctorsIDMappingListener),
-                              menuItem("Surgery ID Mapping", loadSurgeryIDMappingListener))
+    loadDataMenu.items = List(menuItem("Current Schedule",      _ => println("Current Schedule")),
+                              menuItem("Past Surgeries",        _ => println("Past Surgeries")),
+                              menuItem("Profit",                _ => println("Profit")),
+                              menuItem("Doctors ID Mapping",    _ => println("Doctors ID Mapping")),
+                              menuItem("Surgery ID Mapping",    _ => println("Surgery ID Mapping")))
     
     fileMenu.items = List(loadDataMenu)
     
     val modeMenu = new Menu("Mode")
     val menuToggleGroup = new ToggleGroup()
-    modeMenu.items = List(radioItem("Basic Information", radioBasicInformationListener, menuToggleGroup, true),
-                          radioItem("Improvement Information - Average", radioImprovementInformationAverageListener, menuToggleGroup),
-                          radioItem("Improvement Information By Operation", radioImprovementInformationByOperationListener, menuToggleGroup))
+    modeMenu.items = List(radioItem("Basic information", _ => println("Basic information"), menuToggleGroup, true),
+                          radioItem("Improvement information - Average", _ => println("Improvement information - Average"), menuToggleGroup),
+                          radioItem("Improvement information By Operation", _ => println("Improvement information By Operation"), menuToggleGroup))
     
     menus = List(fileMenu, modeMenu)
     prefWidth = Screen.primary.bounds.width

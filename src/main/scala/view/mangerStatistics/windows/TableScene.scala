@@ -70,16 +70,7 @@ trait TableScene extends Scene with TableSceneBaseMappers
     table.columns.foreach(_.setPrefWidth(Screen.primary.bounds.width / columns.size))
     table.prefHeight = Screen.primary.bounds.height
     
-    val menu = new ManagerMenu(
-        loadCurrentScheduleListener = _ => ,
-        loadPastSurgeriesListener = ,
-        loadProfitListener = ,
-        loadDoctorsIDMappingListener = ,
-        loadSurgeryIDMappingListener = ,
-        radioBasicInformationListener = ,
-        radioImprovementInformationAverageListener = ,
-        radioImprovementInformationByOperationListener =
-    )
+    val menu = new ManagerMenu
     val vBox = new VBox()
     vBox.children = List(menu, table)
     root = vBox
