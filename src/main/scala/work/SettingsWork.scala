@@ -1,5 +1,6 @@
 package work
 
+import akka.actor.ActorRef
 import model.DTOs.{DoctorAvailability, Settings}
 
 trait SettingsWork extends Work
@@ -8,6 +9,8 @@ case class AddDoctorAvailabilityWork(doctorAvailability : DoctorAvailability) ex
 
 case class RemoveDoctorAvailabilityWork(doctorAvailability : DoctorAvailability) extends SettingsWork
 
-case class GetSettingsWork(settingsOption: Option[Settings]) extends SettingsWork
+case class GiveMeSettingsWork(responseTo : Option[ActorRef] = None, settingsOption: Option[Settings] = None) extends SettingsWork
 
 case class SetSettingsWork(settings: Settings) extends SettingsWork
+
+case class TellAboutSettingsActorWork(settingsActor : ActorRef) extends Work

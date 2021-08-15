@@ -1,12 +1,17 @@
 package model.actors
 
-import akka.actor.ActorRef
+import akka.actor.{ActorRef, Props}
 import model.DTOs._
 import model.database._
 import work._
 
 import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success}
+
+object SettingsActor
+{
+    def props(m_controller : ActorRef, m_modelManager : ActorRef)(implicit ec : ExecutionContext) : Props = Props(new SettingsActor(m_controller, m_modelManager))
+}
 
 class SettingsActor(m_controller : ActorRef, m_modelManager : ActorRef)(implicit ec : ExecutionContext) extends MyActor
 {
@@ -21,7 +26,7 @@ class SettingsActor(m_controller : ActorRef, m_modelManager : ActorRef)(implicit
         
         case work @ RemoveDoctorAvailabilityWork(doctorAvailability) => removeDoctorAvailabilityWork(work, doctorAvailability)
         
-        case work @ GetSettingsWork(settingsOption) => getSettingsWork(work, settingsOption)
+        case work @ GiveMeSettingsWork(responseTo, _) => giveMeSettingsWork(work, responseTo.getOrElse(sender()))
         
         case work @ SetSettingsWork(settings) => setSettingsWork(work, settings)
     }
@@ -48,13 +53,13 @@ class SettingsActor(m_controller : ActorRef, m_modelManager : ActorRef)(implicit
         }
     }
     
-    def getSettingsWork(work : GetSettingsWork, settingsOption : Option[Settings])
+    def giveMeSettingsWork(work : GiveMeSettingsWork, responseTo : ActorRef)
     {
         settingsTable.get.onComplete
         {
-            case Success(settings) => m_controller ! WorkSuccess(work.copy(settingsOption = Some(settings)), None)
+            case Success(settings) => responseTo ! WorkSuccess(work.copy(settingsOption = Some(settings)), None)
     
-            case Failure(exception) => m_controller ! WorkFailure(work, Some(exception), Some("Can't fetch settings from DB"))
+            case Failure(exception) => responseTo ! WorkFailure(work, Some(exception), Some("Can't fetch settings from DB"))
         }
     }
     

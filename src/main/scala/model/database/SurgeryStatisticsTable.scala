@@ -1,6 +1,6 @@
 package model.database
 
-import model.DTOs.SurgeryStatistics
+import model.DTOs.{OperationCodeAndName, SurgeryStatistics}
 import model.probability.IntegerDistribution
 import org.apache.commons.math3.distribution.EnumeratedIntegerDistribution
 import slick.jdbc.HsqldbProfile.api._
@@ -73,6 +73,12 @@ class SurgeryStatisticsTable(m_db : DatabaseDef)(implicit ec : ExecutionContext)
         }
         
         m_db.run(DBIO.sequence(updates)).map(_.sum)
+    }
+    
+    def getOperationCodeAndNames() : Future[Seq[OperationCodeAndName]] =
+    {
+        val pairsSeqFuture = m_db.run(this.map(row => (row.operationCode, row.operationName)).result)
+        for{seq <- pairsSeqFuture} yield seq.map(OperationCodeAndName.applyPair)
     }
     
     def clear() : Future[Int] =

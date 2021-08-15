@@ -58,20 +58,24 @@ class DatabaseActor(m_controller : ActorRef, m_modelManager : ActorRef)(implicit
         val doctorsBaseStatisticsFuture = doctorStatisticsTable.selectAll()
         val surgeryAvgInfoByDoctorMapFuture = surgeryAvgInfoByDoctorTable.selectAll()
         val surgeryAvgInfoListFuture = surgeryAvgInfoTable.selectAll()
+        val operationCodeAndNamesFuture = surgeryStatisticsTable.getOperationCodeAndNames()
+    
         val workCopyFuture = for
         {
             doctorsBaseStatistics <- doctorsBaseStatisticsFuture
             surgeryAvgInfoByDoctor <- surgeryAvgInfoByDoctorMapFuture
             surgeryAvgInfoList <- surgeryAvgInfoListFuture
+            operationCodeAndNames <- operationCodeAndNamesFuture
         } yield work.copy(
             doctorsBaseStatistics = Some(doctorsBaseStatistics),
             surgeryAvgInfoByDoctorMap = Some(surgeryAvgInfoByDoctor.groupBy(_.doctorId)),
-            surgeryAvgInfoList = Some(surgeryAvgInfoList)
+            surgeryAvgInfoList = Some(surgeryAvgInfoList),
+            operationCodeAndNames = Some(operationCodeAndNames)
         )
         
         workCopyFuture.onComplete
         {
-            case Success(workCopy) => m_controller ! WorkSuccess(workCopy, Some(""))
+            case Success(workCopy) => m_controller ! WorkSuccess(workCopy, None)
 
             case Failure(exception) =>
             {
@@ -198,7 +202,7 @@ class DatabaseActor(m_controller : ActorRef, m_modelManager : ActorRef)(implicit
         {
             case Success(_) =>
             {
-                m_controller ! WorkSuccess(work, Some(s"Successfully load surgery data from ${work.filePath}"))
+                m_controller ! WorkSuccess(work, Some(s"Successfully load surgery data from ${work.file.getPath}"))
             }
     
             case Failure(exception) =>

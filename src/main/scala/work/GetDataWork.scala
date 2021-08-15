@@ -1,6 +1,6 @@
 package work
 
-import model.DTOs.{DoctorStatistics, SurgeryAvgInfo, SurgeryAvgInfoByDoctor, SurgeryBasicInfo, SurgeryStatistics}
+import model.DTOs.{DoctorStatistics, OperationCodeAndName, SurgeryAvgInfo, SurgeryAvgInfoByDoctor, SurgeryBasicInfo, SurgeryStatistics}
 import model.probability.IntegerDistribution
 
 import java.util.Date
@@ -11,7 +11,8 @@ case class GetDoctorsStatisticsWork
 (
     doctorsBaseStatistics : Option[Seq[DoctorStatistics]] = None,
     surgeryAvgInfoByDoctorMap : Option[Map[Int, Seq[SurgeryAvgInfoByDoctor]]] = None,
-    surgeryAvgInfoList : Option[Seq[SurgeryAvgInfo]] = None
+    surgeryAvgInfoList : Option[Seq[SurgeryAvgInfo]] = None,
+    operationCodeAndNames : Option[Seq[OperationCodeAndName]] = None
 ) extends GetDataWork
 
 case class GetOptionsForFreeBlockWork

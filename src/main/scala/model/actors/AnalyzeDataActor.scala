@@ -75,7 +75,7 @@ class AnalyzeDataActor(m_controller : ActorRef,
     
                 case Failure(exception) =>
                 {
-                    m_controller ! WorkFailure(readPastSurgeriesExcelWork, Some(exception), Some(s"Can't generate DB objects from Excel File: ${readPastSurgeriesExcelWork.filePath}"))
+                    m_controller ! WorkFailure(readPastSurgeriesExcelWork, Some(exception), Some(s"Can't generate DB objects from Excel File: ${readPastSurgeriesExcelWork.file.getPath}"))
                 }
             }
         }

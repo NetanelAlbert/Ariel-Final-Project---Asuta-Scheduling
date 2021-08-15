@@ -1,15 +1,18 @@
 package model.actors
 
 import akka.actor.{ActorRef, Props}
-import work.{FileWork, GetDataWork}
+import work.{FileWork, GetDataWork, TellAboutSettingsActorWork}
 
 import scala.concurrent.ExecutionContext
 
 class ModelManager(m_controller : ActorRef)(implicit ec : ExecutionContext) extends MyActor
 {
+    val m_settingActor = context.actorOf(SettingsActor.props(m_controller, self), "SettingsActor")
     val m_databaseActor = context.actorOf(DatabaseActor.props(m_controller, self), "DatabaseActor")
     val m_analyzeDataActor = context.actorOf(AnalyzeDataActor.props(m_controller, self, m_databaseActor), "AnalyzeDataActor")
-    val m_fileActor = context.actorOf(FileActor.props(m_controller, self, m_databaseActor, m_analyzeDataActor), "FileActor")
+    val m_fileActor = context.actorOf(FileActor.props(m_controller, self, m_databaseActor, m_analyzeDataActor, m_settingActor), "FileActor")
+    
+    m_controller ! TellAboutSettingsActorWork(m_settingActor)
     
     override def receive : Receive =
     {
