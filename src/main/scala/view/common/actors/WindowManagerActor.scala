@@ -1,9 +1,9 @@
-package view.actors
+package view.common.actors
 
 import akka.actor.{ActorRef, Props}
 import model.DTOs.{DoctorStatistics, OperationCodeAndName, Settings, SurgeryAvgInfo, SurgeryAvgInfoByDoctor}
 import model.actors.MyActor
-import view.mangerStatistics.MainWindowActions
+import view.common.traits.MainWindowActions
 import work.{GetDoctorsStatisticsWork, ReadDoctorsMappingExcelWork, ReadPastSurgeriesExcelWork, ReadProfitExcelWork, ReadSurgeryMappingExcelWork, TellAboutSettingsActorWork}
 
 import java.io.File
@@ -26,7 +26,7 @@ class WindowManagerActor(m_controller : ActorRef, mainWindow : MainWindowActions
     
     def getDoctorsStatisticsWork(doctorsBaseStatistics : Seq[DoctorStatistics], surgeryAvgInfoByDoctorMap : Map[Int, Seq[SurgeryAvgInfoByDoctor]], surgeryAvgInfoList : Seq[SurgeryAvgInfo], operationCodeAndNames : Seq[OperationCodeAndName])
     {
-        mainWindow.initializeWithData(doctorsBaseStatistics : Seq[DoctorStatistics], surgeryAvgInfoByDoctorMap : Map[Int, Seq[SurgeryAvgInfoByDoctor]], surgeryAvgInfoList : Seq[SurgeryAvgInfo], operationCodeAndNames, this)
+        mainWindow.initializeWithStatisticsData(doctorsBaseStatistics : Seq[DoctorStatistics], surgeryAvgInfoByDoctorMap : Map[Int, Seq[SurgeryAvgInfoByDoctor]], surgeryAvgInfoList : Seq[SurgeryAvgInfo], operationCodeAndNames, this)
     }
     
     override def loadPastSurgeriesListener(file : File) : Unit = m_controller ! ReadPastSurgeriesExcelWork(file)

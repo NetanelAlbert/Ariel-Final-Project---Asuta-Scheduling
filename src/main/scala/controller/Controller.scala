@@ -2,8 +2,8 @@ package controller
 
 import akka.actor.Props
 import model.actors.{ModelManager, MyActor}
-import view.actors.ViewManager
-import view.mangerStatistics.MainWindowActions
+import view.common.actors.ViewManager
+import view.common.traits.MainWindowActions
 import work.{GetDoctorsStatisticsWork, ReadPastSurgeriesExcelWork, WorkSuccess}
 
 import scala.concurrent.ExecutionContext

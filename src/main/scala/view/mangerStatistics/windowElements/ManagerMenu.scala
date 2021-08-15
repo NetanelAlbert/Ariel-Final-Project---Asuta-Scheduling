@@ -3,6 +3,7 @@ package view.mangerStatistics.windowElements
 import javafx.event.{ActionEvent, EventHandler}
 import scalafx.scene.control._
 import scalafx.stage.Screen
+import view.mangerStatistics.windowElements.ManagerMenu.Modes._
 
 class ManagerMenu(loadPastSurgeriesListener : EventHandler[ActionEvent],
                   loadProfitListener : EventHandler[ActionEvent],

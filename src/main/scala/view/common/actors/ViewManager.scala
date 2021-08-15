@@ -1,9 +1,14 @@
-package view.actors
+package view.common.actors
 
 import akka.actor.{ActorRef, Props}
 import model.actors.MyActor
-import view.mangerStatistics.MainWindowActions
+import view.common.traits.MainWindowActions
 import work.{GetDoctorsStatisticsWork, TellAboutSettingsActorWork, WorkFailure, WorkSuccess}
+
+object ViewManager
+{
+    def props(m_controller : ActorRef, mainWindow : MainWindowActions) : Props = Props(new ViewManager(m_controller, mainWindow))
+}
 
 class ViewManager(m_controller : ActorRef, mainWindow : MainWindowActions) extends MyActor
 {
@@ -25,9 +30,4 @@ class ViewManager(m_controller : ActorRef, mainWindow : MainWindowActions) exten
         }
     }
     
-}
-
-object ViewManager
-{
-    def props(m_controller : ActorRef, mainWindow : MainWindowActions) : Props = Props(new ViewManager(m_controller, mainWindow))
 }

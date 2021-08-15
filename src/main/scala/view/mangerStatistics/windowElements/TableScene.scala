@@ -6,7 +6,8 @@ import scalafx.scene.Scene
 import scalafx.scene.control.{ChoiceDialog, TableView}
 import scalafx.scene.layout.VBox
 import scalafx.stage.{FileChooser, Screen, Stage}
-import view.actors.UserActions
+import view.common.actors.UserActions
+import view.mangerStatistics.windowElements.ManagerMenu.Modes._
 
 import java.io.File
 

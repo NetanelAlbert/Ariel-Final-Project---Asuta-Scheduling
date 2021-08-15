@@ -2,7 +2,7 @@ package view.mangerStatistics
 
 import akka.actor.ActorSystem
 import controller.Controller
-import model.DTOs.{DoctorStatistics, OperationCodeAndName, SurgeryAvgInfo, SurgeryAvgInfoByDoctor}
+import model.DTOs.{DoctorStatistics, FutureSurgeryInfo, OperationCodeAndName, SurgeryAvgInfo, SurgeryAvgInfoByDoctor}
 import scalafx.application.{JFXApp3, Platform}
 import scalafx.geometry.Insets
 import scalafx.scene.Scene
@@ -12,7 +12,8 @@ import scalafx.scene.layout.HBox
 import scalafx.scene.paint.Color._
 import scalafx.scene.paint.{LinearGradient, Stops}
 import scalafx.scene.text.Text
-import view.actors.UserActions
+import view.common.actors.UserActions
+import view.common.traits.MainWindowActions
 import view.mangerStatistics.windowElements.TableScene
 
 object MainWindow extends JFXApp3 with MainWindowActions
@@ -38,7 +39,7 @@ object MainWindow extends JFXApp3 with MainWindowActions
         }
     }
     
-    def initializeWithData(doctorsBaseStatistics : Seq[DoctorStatistics], surgeryAvgInfoByDoctorMap : Map[Int, Seq[SurgeryAvgInfoByDoctor]], surgeryAvgInfoList : Seq[SurgeryAvgInfo], operationCodeAndNames : Seq[OperationCodeAndName], userActions : UserActions)
+    def initializeWithStatisticsData(doctorsBaseStatistics : Seq[DoctorStatistics], surgeryAvgInfoByDoctorMap : Map[Int, Seq[SurgeryAvgInfoByDoctor]], surgeryAvgInfoList : Seq[SurgeryAvgInfo], operationCodeAndNames : Seq[OperationCodeAndName], userActions : UserActions)
     {
         Platform.runLater
         {
@@ -78,24 +79,12 @@ object MainWindow extends JFXApp3 with MainWindowActions
             new Alert(AlertType.Error, message).showAndWait()
         }
     }
-}
-
-//case class MainStage(doctorsBaseStatistics : Seq[DoctorStatistics],
-//                     surgeryAvgInfoByDoctorMap : Map[Int, Seq[SurgeryAvgInfoByDoctor]],
-//                     surgeryAvgInfoList : Seq[SurgeryAvgInfo]) extends JFXApp3.PrimaryStage
-//{
-//    maximized = true
-//}
-
-trait MainWindowActions
-{
-    def initializeWithData(doctorsBaseStatistics : Seq[DoctorStatistics],
-                           surgeryAvgInfoByDoctorMap : Map[Int, Seq[SurgeryAvgInfoByDoctor]],
-                           surgeryAvgInfoList : Seq[SurgeryAvgInfo],
-                           operationCodeAndNames : Seq[OperationCodeAndName],
-                           userActions : UserActions)
     
-    def showSuccessDialog(message : String)
+     def initializeWithScheduleData(futureSurgeryInfo : Iterable[FutureSurgeryInfo])
+    {
+        // Do nothing
+        System.err.println(s"${this.getClass}.initializeWithScheduleData() called, but it should be use only for Scheduling app.")
+    }
     
-    def showFailDialog(message : String)
+    override def initializeWithScheduleData(futureSurgeryInfo : Iterable[FutureSurgeryInfo], userActions : UserActions) : Unit = ???
 }
