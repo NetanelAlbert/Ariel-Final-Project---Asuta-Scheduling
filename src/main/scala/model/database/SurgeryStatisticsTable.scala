@@ -24,7 +24,9 @@ class SurgeryStatisticsSchema(tag: Tag) extends Table[SurgeryStatistics](tag, "S
     
     def hospitalizationDistribution = column[IntegerDistribution]("hospitalizationDistribution")
 
-    def profit = column[Option[Double]]("profit")
+    def profit = column[Option[Int]]("profit")
+    
+    def amountOfData = column[Int]("amountOfData")
 
     
     def columns = (
@@ -32,7 +34,8 @@ class SurgeryStatisticsSchema(tag: Tag) extends Table[SurgeryStatistics](tag, "S
         operationName,
         restingDistribution,
         hospitalizationDistribution,
-        profit
+        profit,
+        amountOfData
     )
     
     override def * = columns.mapTo[SurgeryStatistics]
@@ -50,25 +53,50 @@ class SurgeryStatisticsTable(m_db : DatabaseDef)(implicit ec : ExecutionContext)
         m_db.run(this += element)
     }
     
+    def insertAll(elements : Iterable[SurgeryStatistics]) : Future[Option[Int]] =
+    {
+        m_db.run(this ++= elements)
+    }
+    
     def selectAll() : Future[Seq[SurgeryStatistics]] =
     {
         m_db.run(this.result)
     }
     
-    def getSurgeryMapping() : Future[Map[Double, Option[String]]] =
+    def getSurgeryMapping() : Future[Map[Double, String]] =
     {
         m_db.run(this.map(row => (row.operationCode, row.operationName)).result)
-            .map(_.filter(_._2.nonEmpty).toMap)
+            .map(_.filter(_._2.nonEmpty).toMap.mapValues(_.get))
+    }
+   
+    def getProfitMapping() : Future[Map[Double, Int]] =
+    {
+        m_db.run(this.map(row => (row.operationCode, row.profit)).result)
+            .map(_.filter(_._2.nonEmpty).toMap.mapValues(_.get))
     }
     
-    def setSurgeryNames(surgeryMapping : Map[Double, Option[String]]) : Future[Int] =
+    def setSurgeryNames(surgeryMapping : Map[Double, String]) : Future[Int] =
     {
         val updates = surgeryMapping.map
         {
             case (operationCode, operationName) =>
             {
                 this.filter(_.operationCode === operationCode)
-                    .map(_.operationName).update(operationName)
+                    .map(_.operationName).update(Some(operationName))
+            }
+        }
+        
+        m_db.run(DBIO.sequence(updates)).map(_.sum)
+    }
+    
+    def setSurgeriesProfit(surgeriesProfit : Iterable[(Double, Int)]) : Future[Int] =
+    {
+        val updates = surgeriesProfit.map
+        {
+            case (operationCode, profit) =>
+            {
+                this.filter(_.operationCode === operationCode)
+                    .map(_.profit).update(Some(profit))
             }
         }
         
@@ -79,6 +107,11 @@ class SurgeryStatisticsTable(m_db : DatabaseDef)(implicit ec : ExecutionContext)
     {
         val pairsSeqFuture = m_db.run(this.map(row => (row.operationCode, row.operationName)).result)
         for{seq <- pairsSeqFuture} yield seq.map(OperationCodeAndName.applyPair)
+    }
+    
+    def getByIDs(ids : Iterable[Double]) : Future[Seq[SurgeryStatistics]] =
+    {
+        m_db.run(this.filter(_.operationCode inSet ids).result)
     }
     
     def clear() : Future[Int] =

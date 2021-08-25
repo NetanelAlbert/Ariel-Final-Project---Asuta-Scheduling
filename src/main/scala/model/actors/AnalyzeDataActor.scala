@@ -2,9 +2,11 @@ package model.actors
 
 
 import akka.actor.{ActorRef, Props}
-import model.DTOs.{DoctorAvailability, DoctorStatistics, DoctorStatisticsAutoAvg, PastSurgeryInfo, SurgeryAvgInfo, SurgeryAvgInfoByDoctor, SurgeryStatistics}
+import model.DTOs.SurgeryStatisticsImplicits.SurgeryStatisticsToSurgeryBasicInfo
+import model.DTOs._
 import model.probability.IntegerDistribution
-import work.{GetOptionsForFreeBlockWork, ReadPastSurgeriesExcelWork, WorkFailure}
+import org.joda.time.{LocalDate, LocalDateTime}
+import work.{BlockFillingOption, GetOptionsForFreeBlockWork, ReadPastSurgeriesExcelWork, WorkFailure, WorkSuccess}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
@@ -22,18 +24,59 @@ class AnalyzeDataActor(m_controller : ActorRef,
     override def receive =
     {
         case work : ReadPastSurgeriesExcelWork => readPastSurgeriesExcelWork(work, work.pasteSurgeries)
-
-        case work : GetOptionsForFreeBlockWork => getOptionsForFreeBlockWork(work)
+        
+        case work @ GetOptionsForFreeBlockWork(_, _, _, Some(doctorsWithSurgeries), Some(doctorMapping), Some(surgeryStatistics), Some(surgeryAvgInfo), Some(plannedSurgeries), _) => getOptionsForFreeBlockWork(work, doctorsWithSurgeries, doctorMapping, surgeryStatistics, surgeryAvgInfo, plannedSurgeries)
     }
     
-    def getOptionsForFreeBlockWork(work : GetOptionsForFreeBlockWork) = ??? // TODO Implement
+    def getOptionsForFreeBlockWork(work : GetOptionsForFreeBlockWork, doctorsWithSurgeries : Map[Int, Seq[SurgeryAvgInfoByDoctor]], doctorMapping : Map[Int, String], surgeryStatistics : Seq[SurgeryStatistics], surgeryAvgInfo : Seq[SurgeryAvgInfo], plannedSurgeries : Seq[FutureSurgeryInfo])
+    {
+        // TODO implement real algorithm ! ! ! !
+        //  !
+        //  !
+        //  !
+        val doc1 = doctorsWithSurgeries.keySet.head
+        val option1 = BlockFillingOption(doc1,
+                                         doctorMapping.get(doc1),
+                                         doctorsWithSurgeries(doc1).flatMap(surg =>
+                                                                                surgeryStatistics.find(_.operationCode == surg.operationCode)
+                                                                                                 .map(_.basicInfo)),
+                                         1, 1, 1, 1, 1)
+        val doc2 = doctorsWithSurgeries.keySet.tail.head
+        val option2 = BlockFillingOption(doc2,
+                                         doctorMapping.get(doc2),
+                                         doctorsWithSurgeries(doc2).flatMap(surg =>
+                                                                                surgeryStatistics.find(_.operationCode == surg.operationCode)
+                                                                                                 .map(_.basicInfo)),
+                                         .1, .1, .1, .1, 5)
+        
+        val workCopy = work.copy(topOptions = Some(Seq(option1, option2)))
+        
+        m_controller ! WorkSuccess(workCopy, Some("!!! Not real data !!!"))
+        
+        // real flow:
+        val options = doctorsWithSurgeries.values.map(knapsack(_, surgeryStatistics, surgeryAvgInfo))
+        
+    }
+    
+    case class KnapsackSurgery(operationCode : Double, expectedDurationMinutes : Int, amountOfData : Int, profit : Int)
+    {
+        def weight = expectedDurationMinutes
+        
+        def price = amountOfData // todo - profit might be irrelevant and might pun weights on them
+    }
+    
+    def knapsack(doctorSurgeries : Seq[SurgeryAvgInfoByDoctor], surgeryStatistics : Seq[SurgeryStatistics], surgeryAvgInfo : Seq[SurgeryAvgInfo]) : Seq[BlockFillingOption] =
+    {
+        Seq() // TODO
+    }
     
     
     def getDoctorAvailability(pasteSurgeries : Iterable[PastSurgeryInfo]) : Future[Set[DoctorAvailability]] =
     {
         Future
         {
-            pasteSurgeries.map(surgery => DoctorAvailability(surgery.doctorId, surgery.blockStart.getDayOfWeek)).toSet
+            val threshold = LocalDateTime.now().minusYears(2)
+            pasteSurgeries.filter(_.blockStart.isAfter(threshold)).map(surgery => DoctorAvailability(surgery.doctorId, surgery.blockStart.getDayOfWeek)).toSet
         }
     }
     
@@ -44,7 +87,7 @@ class AnalyzeDataActor(m_controller : ActorRef,
             val info = "Got ReadPastSurgeriesExcelWork without pasteSurgeries"
             m_controller ! WorkFailure(readPastSurgeriesExcelWork, None, Some(info))
         }
-
+        
         case Some(pasteSurgeries) =>
         {
             val surgeryStatisticsIterableFuture = getSurgeryStatistics(pasteSurgeries)
@@ -72,7 +115,7 @@ class AnalyzeDataActor(m_controller : ActorRef,
             copyWorkFuture.onComplete
             {
                 case Success(workCopy) => m_databaseActor ! workCopy
-    
+                
                 case Failure(exception) =>
                 {
                     m_controller ! WorkFailure(readPastSurgeriesExcelWork, Some(exception), Some(s"Can't generate DB objects from Excel File: ${readPastSurgeriesExcelWork.file.getPath}"))
@@ -89,7 +132,7 @@ class AnalyzeDataActor(m_controller : ActorRef,
             {
                 case (operationCode, surgeryListByOp) =>
                 {
-            
+                    
                     val surgeryAvg = average(surgeryListByOp.map(_.surgeryDurationMinutes))
                     val restingAvg = average(surgeryListByOp.map(_.restingMinutes))
                     val hospitalizationAvg = average(surgeryListByOp.map(_.hospitalizationHours))
@@ -131,22 +174,20 @@ class AnalyzeDataActor(m_controller : ActorRef,
             {
                 case (id, iterable) =>
                 {
-            
-                    val name = None // todo get names
+                    
                     val amountOfData = iterable.size
-                    val profitAvg = 1.11 // todo get profit
-            
+                    
                     val (surgery, resting, hospitalization) = iterable.aggregate((0, 0, 0))(addSurgeryInfoToTuple, sumTwoTuples)
-            
+                    
                     val surgeryDurationAvgMinutes = surgery.toDouble / amountOfData
                     val restingDurationAvgMinutes = resting.toDouble / amountOfData
                     val hospitalizationDurationAvgHours = hospitalization.toDouble / amountOfData
-            
+                    
                     DoctorStatisticsAutoAvg(
                         id,
-                        name,
+                        name = None,
                         amountOfData,
-                        profitAvg,
+                        profit = None,
                         surgeryDurationAvgMinutes,
                         restingDurationAvgMinutes,
                         hospitalizationDurationAvgHours)
@@ -165,12 +206,13 @@ class AnalyzeDataActor(m_controller : ActorRef,
                 {
                     val restingDistribution = IntegerDistribution(list.map(_.restingMinutes))
                     val hospitalizationDistribution = IntegerDistribution(list.map(_.hospitalizationHours))
-            
+                    
                     SurgeryStatistics(operationCode,
                                       operationName = None,
                                       restingDistribution,
                                       hospitalizationDistribution,
-                                      profit = None)
+                                      profit = None,
+                                      list.size)
                 }
             }
         }
@@ -187,8 +229,8 @@ class AnalyzeDataActor(m_controller : ActorRef,
     
     def sumTwoTuples(tuple1 : (Int, Int, Int), tuple2 : (Int, Int, Int)) : (Int, Int, Int) = (tuple1, tuple2) match
     {
-        case((a1, b1, c1), (a2, b2, c2)) => (a1 + a2, b1 + b2, c1 + c2)
+        case ((a1, b1, c1), (a2, b2, c2)) => (a1 + a2, b1 + b2, c1 + c2)
     }
     
-    def average(iterable : Iterable[Int]) : Double = iterable.sum.toDouble/iterable.size
+    def average(iterable : Iterable[Int]) : Double = iterable.sum.toDouble / iterable.size
 }

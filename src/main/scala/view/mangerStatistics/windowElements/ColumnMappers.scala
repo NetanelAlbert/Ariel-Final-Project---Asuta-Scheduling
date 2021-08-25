@@ -13,7 +13,7 @@ trait TableSceneBaseMappers
     
     import TableSceneBaseMappers._
     
-    def profitAvgColMapper(sdf : CellDataFeatures[DoctorStatistics, Double]) : ObservableValue[Double, Double]
+    def profitAvgColMapper(sdf : CellDataFeatures[DoctorStatistics, Int]) : ObservableValue[Int, Int]
     
     def surgeryDurationAvgMinutesColMapper(sdf : CellDataFeatures[DoctorStatistics, Double]) : ObservableValue[Double, Double]
     
@@ -33,7 +33,7 @@ object TableSceneBaseMappers
 
 class TableSceneNormalMappers extends TableSceneBaseMappers
 {
-    def profitAvgColMapper(sdf : CellDataFeatures[DoctorStatistics, Double]) : ObservableValue[Double, Double] = ObjectProperty(double2digits(sdf.value.profitAvg))
+    def profitAvgColMapper(sdf : CellDataFeatures[DoctorStatistics, Int]) : ObservableValue[Int, Int] = ObjectProperty(sdf.value.profit.getOrElse(Int.MinValue)) //TODO is it ok?
     
     def surgeryDurationAvgMinutesColMapper(sdf : CellDataFeatures[DoctorStatistics, Double]) : ObservableValue[Double, Double] = ObjectProperty(double2digits(sdf.value.surgeryDurationAvgMinutes))
     

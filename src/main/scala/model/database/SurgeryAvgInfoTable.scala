@@ -45,9 +45,19 @@ class SurgeryAvgInfoTable(m_db : DatabaseDef) extends TableQuery(new SurgeryAvgI
         m_db.run(this += element)
     }
     
+    def insertAll(elements : Iterable[SurgeryAvgInfo]) : Future[Option[Int]] =
+    {
+        m_db.run(this ++= elements)
+    }
+    
     def selectAll() : Future[Seq[SurgeryAvgInfo]] =
     {
         m_db.run(this.result)
+    }
+    
+    def getByIDs(ids : Iterable[Double]) : Future[Seq[SurgeryAvgInfo]] =
+    {
+        m_db.run(this.filter(_.operationCode inSet ids).result)
     }
     
     def clear() : Future[Int] =

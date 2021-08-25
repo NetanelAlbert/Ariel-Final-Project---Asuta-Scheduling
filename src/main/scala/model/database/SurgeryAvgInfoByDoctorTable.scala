@@ -6,7 +6,7 @@ import slick.jdbc.HsqldbProfile.backend.DatabaseDef
 import slick.lifted.ProvenShape.proveShapeOf
 import slick.lifted.Tag
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 
 class SurgeryAvgInfoByDoctorSchema(tag: Tag) extends Table[SurgeryAvgInfoByDoctor](tag, "SurgeryAvgInfoByDoctor")
@@ -36,7 +36,7 @@ class SurgeryAvgInfoByDoctorSchema(tag: Tag) extends Table[SurgeryAvgInfoByDocto
     override def * = columns.mapTo[SurgeryAvgInfoByDoctor]
 }
 
-class SurgeryAvgInfoByDoctorTable(m_db : DatabaseDef) extends TableQuery(new SurgeryAvgInfoByDoctorSchema(_)) with BaseDB[SurgeryAvgInfoByDoctor]
+class SurgeryAvgInfoByDoctorTable(m_db : DatabaseDef)(implicit ex : ExecutionContext) extends TableQuery(new SurgeryAvgInfoByDoctorSchema(_)) with BaseDB[SurgeryAvgInfoByDoctor]
 {
     def create() : Future[Unit] =
     {
@@ -48,14 +48,29 @@ class SurgeryAvgInfoByDoctorTable(m_db : DatabaseDef) extends TableQuery(new Sur
         m_db.run(this += element)
     }
     
+    def insertAll(elements : Iterable[SurgeryAvgInfoByDoctor]) : Future[Option[Int]] =
+    {
+        m_db.run(this ++= elements)
+    }
+    
     def selectAll() : Future[Seq[SurgeryAvgInfoByDoctor]] =
     {
         m_db.run(this.result)
     }
     
-    def getSurgeriesByDoctor(doctorID : Int) : Future[Seq[Double]] =
+    def getSurgeriesIDByDoctor(doctorID : Int) : Future[Seq[Double]] =
     {
         m_db.run(this.filter(_.doctorId === doctorID).map(_.operationCode).result)
+    }
+    
+    def getSurgeriesByDoctor(doctorID : Int) : Future[Seq[SurgeryAvgInfoByDoctor]] =
+    {
+        m_db.run(this.filter(_.doctorId === doctorID).result)
+    }
+    
+    def getSurgeriesByDoctors(doctorIDs : Iterable[Int]) : Future[Map[Int, Seq[SurgeryAvgInfoByDoctor]]] =
+    {
+        m_db.run(this.filter(_.doctorId inSet doctorIDs).result).map(_.groupBy(_.doctorId))
     }
     
     def clear() : Future[Int] =

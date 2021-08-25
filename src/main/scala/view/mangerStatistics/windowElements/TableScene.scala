@@ -3,10 +3,12 @@ package view.mangerStatistics.windowElements
 import model.DTOs.{DoctorStatistics, OperationCodeAndName, SurgeryAvgInfo, SurgeryAvgInfoByDoctor}
 import scalafx.collections.ObservableBuffer
 import scalafx.scene.Scene
-import scalafx.scene.control.{ChoiceDialog, TableView}
+import scalafx.scene.control.Alert.AlertType
+import scalafx.scene.control.{Alert, ButtonType, ChoiceDialog, TableView}
 import scalafx.scene.layout.VBox
 import scalafx.stage.{FileChooser, Screen, Stage}
-import view.common.actors.UserActions
+import view.common.UiUtils.{askIfToKeepMappingAndLoadPastSurgeries, getPathFromUserAndCall}
+import view.mangerStatistics.StatisticsUserActions
 import view.mangerStatistics.windowElements.ManagerMenu.Modes._
 
 import java.io.File
@@ -22,7 +24,7 @@ class TableScene(val doctorsBaseStatistics : Seq[DoctorStatistics],
                  val surgeryAvgInfoList : Seq[SurgeryAvgInfo],
                  operationCodeAndNames : Seq[OperationCodeAndName],
                  stage : Stage,
-                 userActions : UserActions) extends Scene
+                 userActions : StatisticsUserActions) extends Scene
 {
     val APP_NAME = "Doctors Statistics"
     
@@ -41,11 +43,16 @@ class TableScene(val doctorsBaseStatistics : Seq[DoctorStatistics],
     table.columns.foreach(_.setPrefWidth(Screen.primary.bounds.width / Columns.columns.size))
     table.prefHeight = Screen.primary.bounds.height
     
+    def loadPastSurgeriesAndCall = getPathFromUserAndCall(stage, "Select Past Surgeries File")(_)
+    def loadProfitAndCall = getPathFromUserAndCall(stage, "Select Profit File")(_)
+    def loadDoctorsIDMappingAndCall = getPathFromUserAndCall(stage, "Select Doctors ID Mapping File")(_)
+    def loadSurgeryIDMappingAndCall = getPathFromUserAndCall(stage, "Select Surgery ID Mapping File")(_)
+    
     val menu = new ManagerMenu(
-        loadPastSurgeriesListener = _ => getPathFromUserAndCall(userActions.loadPastSurgeriesListener),
-        loadProfitListener = _ => getPathFromUserAndCall(userActions.loadProfitListener),
-        loadDoctorsIDMappingListener = _ => getPathFromUserAndCall(userActions.loadDoctorsIDMappingListener),
-        loadSurgeryIDMappingListener = _ => getPathFromUserAndCall(userActions.loadSurgeryIDMappingListener),
+        loadPastSurgeriesListener = _ => loadPastSurgeriesAndCall(askIfToKeepMappingAndLoadPastSurgeries(stage, userActions)),
+        loadProfitListener = _ => loadProfitAndCall(userActions.loadProfitListener),
+        loadSurgeryIDMappingListener = _ => loadSurgeryIDMappingAndCall(userActions.loadSurgeryIDMappingListener),
+        loadDoctorsIDMappingListener = _ => loadDoctorsIDMappingAndCall(userActions.loadDoctorsIDMappingListener),
         
         radioBasicInformationListener = _ => setNormalState(),
         radioImprovementInformationAverageListener = _ => setImproveAvgState(),
@@ -56,14 +63,6 @@ class TableScene(val doctorsBaseStatistics : Seq[DoctorStatistics],
     val vBox = new VBox()
     vBox.children = List(menu, table)
     root = vBox
-    
-    def getPathFromUserAndCall(action : File => Unit)
-    {
-        val fileChooser = new FileChooser
-        fileChooser.extensionFilters.addAll(new FileChooser.ExtensionFilter("Excel files", "*.xlsx"))
-        val selectedFileOption = Option(fileChooser.showOpenDialog(stage))
-        selectedFileOption.foreach(action)
-    }
     
     def setNormalState()
     {

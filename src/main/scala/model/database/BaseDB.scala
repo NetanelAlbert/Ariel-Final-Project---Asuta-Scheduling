@@ -8,13 +8,8 @@ trait BaseDB[T]
     
     def insert(element : T) : Future[Int]
     
-    def insertAll(elements : Iterable[T]) : Future[Int] =
-    {
-        import scala.concurrent.ExecutionContext.Implicits.global
-        val insertFutureSeq = elements.map(insert)
-        Future.sequence(insertFutureSeq).map(_.sum)
-    }
-    
+    def insertAll(elements : Iterable[T]) : Future[Option[Int]]
+
     def selectAll() : Future[Seq[T]]
     
     def clear() : Future[Int]

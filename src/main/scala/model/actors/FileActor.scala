@@ -1,23 +1,18 @@
 package model.actors
 
+import akka.actor.{ActorRef, Props}
+import model.DTOs.{FutureSurgeryInfo, PastSurgeryInfo}
 import org.apache.poi.ss.usermodel.{DataFormatter, Row, Sheet, WorkbookFactory}
-import spray.json.DefaultJsonProtocol
-import spray.json._
-import DefaultJsonProtocol._
-import akka.actor.{Actor, ActorRef, Props}
+import org.joda.time.{Days, Duration, Hours, LocalDate, LocalDateTime, Minutes}
+import org.joda.time.format.DateTimeFormat
+import work._
 
 import java.io.File
-import java.io.PrintWriter
-import collection.JavaConversions._
-import model.DTOs.FormattingProtocols._
-import model.DTOs.{DoctorStatistics, PastSurgeryInfo}
-import org.joda.time.LocalDate
-import work.{ReadDoctorsMappingExcelWork, ReadPastSurgeriesExcelWork, ReadProfitExcelWork, ReadSurgeryMappingExcelWork, WorkFailure}
-
-import java.sql.{Date, Timestamp}
 import java.util.concurrent.TimeUnit
+import scala.collection.JavaConversions._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
+import common.Utils._
 
 object FileActor
 {
@@ -39,6 +34,7 @@ class FileActor(m_controller : ActorRef,
                 m_AnalyzeDataActor : ActorRef,
                 m_settingActor : ActorRef)(implicit ec : ExecutionContext) extends MyActor
 {
+    val formatter = new DataFormatter()
     
     override def receive =
     {
@@ -49,45 +45,119 @@ class FileActor(m_controller : ActorRef,
         case work : ReadDoctorsMappingExcelWork => readDoctorMappingExcelWork(work, work.file)
         
         case work : ReadProfitExcelWork => readProfitExcelWork(work, work.file)
+        
+        case work : ReadFutureSurgeriesExcelWork => readFutureSurgeriesExcelWork(work, work.file)
+    }
+    
+    def readFutureSurgeriesExcelWork(work : ReadFutureSurgeriesExcelWork, file : File)
+    {
+        Future
+        {
+            getSheet(file).flatMap(getFutureSurgeryFromRow)
+        }.onComplete
+        {
+            case Success(futureSurgeries) if futureSurgeries.nonEmpty =>
+            {
+                m_databaseActor ! work.copy(futureSurgeries = Some(futureSurgeries))
+            }
+            
+            case Success(_) =>
+            {
+                import FutureSurgeryDataExcelColumns._
+                val info =
+                    s"""Can't read schedule.
+                       |File is empty or wrong format:
+                       |'${file.getPath}'
+                       |Dates must be in format "dd/MM/yyyy hh:mm"
+                       |Columns indexes are:
+                       |operationCodeIndex - $operationCodeIndex
+                       |doctorIdIndex - $doctorIdIndex
+                       |plannedStartIndex - $plannedStartIndex
+                       |operationRoomIndex - $operationRoomIndex
+                       |blockStartIndex - $blockStartIndex
+                       |blockEndIndex - $blockEndIndex
+                       |releasedIndex - $releasedIndex
+                       |""".stripMargin
+                m_controller ! WorkFailure(work, None, Some(info))
+            }
+            
+            case Failure(exception) =>
+            {
+                val info = s"Can't read old surgeries from '${file.getPath}''"
+                m_controller ! WorkFailure(work, Some(exception), Some(info))
+            }
+        }
     }
     
     def readProfitExcelWork(work : ReadProfitExcelWork, file : File)
     {
-        //todo implement
-        m_controller ! WorkFailure(work, None, Some(s"${work.getClass} is no yet implemented"))
+        Future
+        {
+            val doctorsProfit = getSheet(file, 0).flatMap(getTuple2FromRow(_.toInt, _.toInt))
+            val surgeriesProfit = getSheet(file, 1).flatMap(getTuple2FromRow(_.toDouble, _.toInt))
+            (doctorsProfit, surgeriesProfit)
+        } onComplete
+        {
+            case Success((doctorsProfit, surgeriesProfit)) if doctorsProfit.nonEmpty && surgeriesProfit.nonEmpty =>
+            {
+                m_databaseActor ! work.copy(doctorsProfit = Some(doctorsProfit),
+                                            surgeriesProfit = Some(surgeriesProfit))
+            }
+            
+            case Success(_) =>
+            {
+                val info =
+                    """Empty or wrong format given profit loading.
+                      |The format is:
+                      |First sheet - doctors profit - Integer in first and second column.
+                      |Second sheet - surgeries profit - Float number in first column and Integer in the second.
+                      |""".stripMargin
+                m_controller ! WorkFailure(work, None, Some(info))
+            }
+            
+            case Failure(exception) =>
+            {
+                val info = s"Can't read profit data from '${file.getPath}''"
+                m_controller ! WorkFailure(work, Some(exception), Some(info))
+            }
+        }
+        
     }
     
     def readSurgeryMappingExcelWork(work : ReadSurgeryMappingExcelWork, file : File)
     {
-        implicit val formatter = new DataFormatter()
-        val surgeryMapping = getSheet(file).flatMap(getDoubleStringFromRow(_)).toMap
+        val surgeryMapping = getSheet(file).map(getDoubleStringFromRow).flatten.toMap.filter(_._2.nonEmpty)
         
-        if(surgeryMapping.nonEmpty)
+        if (surgeryMapping.nonEmpty)
         {
             m_databaseActor ! work.copy(surgeryMapping = Some(surgeryMapping))
-        }else
+        } else
         {
             val info = "Surgery mapping file must have ID (real number) in the first column, and name on the second"
             m_controller ! WorkFailure(work, None, Some(info))
         }
     }
     
-    def getDoubleStringFromRow(row : Row)(implicit formatter: DataFormatter) : Option[(Double, Option[String])] =
+    def getDoubleStringFromRow(row : Row) : Option[(Double, String)] =
+    {
+        getTuple2FromRow(_.toDouble, identity)(row)
+    }
+    
+    def getTuple2FromRow[A, B](AConverter : String => A, BConverter : String => B)(row : Row) : Option[(A, B)] =
     {
         Try
         {
-            val operationCode = formatter.formatCellValue(row.getCell(0)).toDouble
-            val name = formatter.formatCellValue(row.getCell(1))
-            (operationCode, Some(name))
+            val a = formatter.formatCellValue(row.getCell(0))
+            val b = formatter.formatCellValue(row.getCell(1))
+            (AConverter(a), BConverter(b))
         }.toOption
     }
     
     def readDoctorMappingExcelWork(work : ReadDoctorsMappingExcelWork, file : File)
     {
-        implicit val formatter = new DataFormatter()
-        val doctorMapping = getSheet(file).flatMap(getIntStringFromRow(_)).toMap
+        val doctorMapping = getSheet(file).map(getIntStringFromRow).flatten.toMap.filter(_._2.nonEmpty)
         
-        if(doctorMapping.nonEmpty)
+        if (doctorMapping.nonEmpty)
         {
             m_databaseActor ! work.copy(doctorMapping = Some(doctorMapping))
         } else
@@ -98,31 +168,45 @@ class FileActor(m_controller : ActorRef,
         
     }
     
-    def getIntStringFromRow(row : Row)(implicit formatter: DataFormatter) : Option[(Int, Option[String])] =
+    def getIntStringFromRow(row : Row) : Option[(Int, String)] =
     {
-        Try
-        {
-            val operationCode = formatter.formatCellValue(row.getCell(0)).toInt
-            val name = formatter.formatCellValue(row.getCell(1))
-            (operationCode, Some(name))
-        }.toOption
+        getTuple2FromRow(_.toInt, identity)(row)
     }
     
     def readPastSurgeriesExcelWork(readPastSurgeriesExcelWork : ReadPastSurgeriesExcelWork, file : File)
     {
-        getAllPastSurgeryFromExcel(file).onComplete
+        Future
+        {
+            
+            getSheet(file).map(getPastSurgeryFromRow).flatten
+        }.onComplete
         {
             case Success(pastSurgeryInfoIterable) if pastSurgeryInfoIterable.nonEmpty =>
             {
                 m_AnalyzeDataActor ! readPastSurgeriesExcelWork.copy(pasteSurgeries = Some(pastSurgeryInfoIterable))
             }
-
+            
             case Success(_) =>
             {
-                val info = s"Can't read old surgeries. \nFile is empty or wrong format: \n'${file.getPath}''"
+                import PastSurgeryDataExcelColumns._
+                val info =
+                    s"""Can't read old surgeries.
+                       |File is empty or wrong format:
+                       |'${file.getPath}'
+                       |Dates must be in format "dd/MM/yyyy hh:mm"
+                       |Columns indexes are:
+                       |doctor id: $operationCodeIndex
+                       |operation code: $doctorIdIndex
+                       |surgery start: $surgeryStartIndex
+                       |surgery end: $surgeryEndIndex
+                       |resting start: $restingStartIndex
+                       |resting end: $restingEndIndex
+                       |block start: $blockStartIndex
+                       |block end: $blockEndIndex
+                       |release date: $releaseDateIndex""".stripMargin
                 m_controller ! WorkFailure(readPastSurgeriesExcelWork, None, Some(info))
             }
-
+            
             case Failure(exception) =>
             {
                 val info = s"Can't read old surgeries from '${file.getPath}''"
@@ -131,33 +215,22 @@ class FileActor(m_controller : ActorRef,
         }
     }
     
-    def getAllPastSurgeryFromExcel(file : File) : Future[Iterable[PastSurgeryInfo]] =
+    def getPastSurgeryFromRow(row : Row) : Option[PastSurgeryInfo] =
     {
-        Future
-        {
-            //todo extract info about who can work in each hour
-            implicit val formatter = new DataFormatter()
-            getSheet(file).flatMap(getPastSurgeryFromRow(_))
-        }
-    }
-    
-    def getPastSurgeryFromRow(row : Row)(implicit formatter: DataFormatter) : Option[PastSurgeryInfo] =
-    {
-        import SurgeryDataExcelColumns._
+        import PastSurgeryDataExcelColumns._
         Try
         {
             val operationCode = formatter.formatCellValue(row.getCell(operationCodeIndex)).toDouble
             val doctorId = formatter.formatCellValue(row.getCell(doctorIdIndex)).toInt
-            val surgeryDurationMinutes = dateDiff(row, surgeryStartIndex, surgeryEndIndex, TimeUnit.MINUTES)
-            val restingMinutes = dateDiff(row, restingStartIndex, restingEndIndex, TimeUnit.MINUTES)
-            //TODO :: get hospitalization info from new file (Roy)
-            val hospitalizationHours = dateDiff(row, restingStartIndex, restingEndIndex, TimeUnit.MINUTES)
-        
+            val surgeryDurationMinutes = minutesDiff(row, surgeryStartIndex, surgeryEndIndex)
+            val restingMinutes = minutesDiff(row, restingStartIndex, restingEndIndex)
+            val hospitalizationHours = hoursDiff(row, restingStartIndex, releaseDateIndex)
+            
             val blockStartString = formatter.formatCellValue(row.getCell(blockStartIndex))
-            val blockStart = new LocalDate(sdFormat.parse(blockStartString).getTime)
+            val blockStart = dateTimeFormat.parseLocalDateTime(blockStartString)
             val blockEndString = formatter.formatCellValue(row.getCell(blockEndIndex))
-            val blockEnd = new LocalDate(sdFormat.parse(blockEndString).getTime)
-        
+            val blockEnd = dateTimeFormat.parseLocalDateTime(blockEndString)
+            
             PastSurgeryInfo(operationCode,
                             doctorId,
                             surgeryDurationMinutes,
@@ -168,28 +241,72 @@ class FileActor(m_controller : ActorRef,
         }.toOption
     }
     
-    val sdFormat = new java.text.SimpleDateFormat("MM/dd/yyyy hh:mm")
-    def dateDiff(row : Row, startIndex : Int, endIndex : Int, unit : TimeUnit)(implicit formatter : DataFormatter) : Int =
+    
+    def getFutureSurgeryFromRow(row : Row) : Option[FutureSurgeryInfo] =
     {
-        val start = formatter.formatCellValue(row.getCell(startIndex))
-        val end = formatter.formatCellValue(row.getCell(endIndex))
-        val diff = sdFormat.parse(end).getTime - sdFormat.parse(start).getTime
-        unit.convert(diff, TimeUnit.MILLISECONDS).toInt
+        import FutureSurgeryDataExcelColumns._
+        val trying = Try
+        {
+            val operationCode = formatter.formatCellValue(row.getCell(operationCodeIndex)).toDouble
+            val doctorId = formatter.formatCellValue(row.getCell(doctorIdIndex)).toInt
+            val plannedStart = dateTimeFormat.parseLocalDateTime(formatter.formatCellValue(row.getCell(plannedStartIndex)))
+            val operationRoom = formatter.formatCellValue(row.getCell(operationRoomIndex)).toInt
+            val released = formatter.formatCellValue(row.getCell(releasedIndex)).nonEmpty
+            val blockStart = dateTimeFormat.parseLocalTime(formatter.formatCellValue(row.getCell(blockStartIndex)))
+            val blockEnd = dateTimeFormat.parseLocalTime(formatter.formatCellValue(row.getCell(blockEndIndex)))
+            
+            FutureSurgeryInfo(operationCode,
+                              doctorId,
+                              plannedStart,
+                              operationRoom - roomsStart,
+                              blockStart,
+                              blockEnd,
+                              released,
+                              )
+        }
+        trying.failed.foreach(e => println(s"Error while pars row: \n${row.cellIterator().map(formatter.formatCellValue).mkString(", ")} \nError: \n${e.getMessage}"))
+        trying.foreach(e => println(s"Succeed pars row: \n${row.cellIterator().map(formatter.formatCellValue).mkString(", ")} into \n$e"))
+        trying.toOption
+    }
+    
+    def minutesDiff = dateDiff((start, end) => Minutes.minutesBetween(start, end).getMinutes)(_, _, _)
+    def hoursDiff = dateDiff((start, end) => Hours.hoursBetween(start, end).getHours)(_, _, _)
+    
+    
+    def dateDiff(diff : (LocalDateTime, LocalDateTime) => Int)(row : Row, startIndex : Int, endIndex : Int) : Int =
+    {
+        val startString = formatter.formatCellValue(row.getCell(startIndex))
+        val endString = formatter.formatCellValue(row.getCell(endIndex))
+    
+        val start = dateTimeFormat.parseLocalDateTime(startString)
+        val end = dateTimeFormat.parseLocalDateTime(endString)
+        
+        diff(start, end)
     }
     
     
-    object SurgeryDataExcelColumns
+    object PastSurgeryDataExcelColumns
     {
-        val operationCodeIndex = 2
-        val doctorIdIndex = 1
+        val doctorIdIndex = 2
+        val operationCodeIndex = 3
         val surgeryStartIndex = 20
         val surgeryEndIndex = 23
         val restingStartIndex = 25
         val restingEndIndex = 26
-        //        val hospitalizationStartIndex =
-        //        val hospitalizationEndIndex =
         val blockStartIndex = 27
         val blockEndIndex = 28
+        val releaseDateIndex = 29
+    }
+    
+    object FutureSurgeryDataExcelColumns
+    {
+        val doctorIdIndex = 2
+        val operationCodeIndex = 3
+        val plannedStartIndex = 10
+        val operationRoomIndex = 13
+        val blockStartIndex = 27
+        val blockEndIndex = 28
+        val releasedIndex = 29
     }
     
     //TODO :: handle fail? maybe validate file on UI?
@@ -202,36 +319,36 @@ class FileActor(m_controller : ActorRef,
     
     //json files operations
     
-//    val SURGEON_STATISTICS_JSON_PATH = "SURGEON_STATISTICS"
-//    //TODO :: handle fail?
-//    def saveJsonToFile(jsValue : JsValue, path : String)
-//    {
-//        new PrintWriter(path)
-//        {
-//            try
-//            {
-//                write(jsValue.toString)
-//            } finally close()
-//        }
-//    }
-//
-//    def saveDoctorInfo(doctorInfoList : List[DoctorStatistics])
-//    {
-//        saveJsonToFile(doctorInfoList.toJson, SURGEON_STATISTICS_JSON_PATH)
-//    }
-//
-//    def getDoctorInfo : List[DoctorStatistics] =
-//    {
-//        val source = scala.io.Source.fromFile("file.txt")
-//
-//        try
-//        {
-//            source.mkString.toJson.convertTo[List[DoctorStatistics]]
-//        } finally source.close
-//    }
-//
-//    def deleteFile(filePath : String) : Boolean =
-//    {
-//        new File(filePath).delete()
-//    }
+    //    val SURGEON_STATISTICS_JSON_PATH = "SURGEON_STATISTICS"
+    //    //TODO :: handle fail?
+    //    def saveJsonToFile(jsValue : JsValue, path : String)
+    //    {
+    //        new PrintWriter(path)
+    //        {
+    //            try
+    //            {
+    //                write(jsValue.toString)
+    //            } finally close()
+    //        }
+    //    }
+    //
+    //    def saveDoctorInfo(doctorInfoList : List[DoctorStatistics])
+    //    {
+    //        saveJsonToFile(doctorInfoList.toJson, SURGEON_STATISTICS_JSON_PATH)
+    //    }
+    //
+    //    def getDoctorInfo : List[DoctorStatistics] =
+    //    {
+    //        val source = scala.io.Source.fromFile("file.txt")
+    //
+    //        try
+    //        {
+    //            source.mkString.toJson.convertTo[List[DoctorStatistics]]
+    //        } finally source.close
+    //    }
+    //
+    //    def deleteFile(filePath : String) : Boolean =
+    //    {
+    //        new File(filePath).delete()
+    //    }
 }

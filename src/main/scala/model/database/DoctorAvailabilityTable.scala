@@ -32,11 +32,6 @@ class DoctorAvailabilityTable(m_db : DatabaseDef)(implicit ec : ExecutionContext
         m_db.run(this.schema.createIfNotExists)
     }
     
-    def insert(doctorAvailability : DoctorAvailability) : Future[Int] =
-    {
-        m_db.run(this += doctorAvailability)
-    }
-    
     def insertIfNotExist(doctorAvailability : DoctorAvailability) : Future[Int] =
     {
         val DoctorAvailability(doctorId : Int, day : Int) = doctorAvailability

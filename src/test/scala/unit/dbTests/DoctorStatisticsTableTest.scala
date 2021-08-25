@@ -17,16 +17,16 @@ class DoctorStatisticsTableTest extends FlatSpec with Matchers with BeforeAndAft
     val db = DBConnection.get(test = true)
     val table = new DoctorStatisticsTable(db)
     
-    val objects = List( // TODO HourOfWeek
-        DoctorStatisticsAutoAvg(1, Some("David"), 450, 2.543, 6453.34, .3, 54.656),
-        DoctorStatisticsAutoAvg(2, Some("Avi"), 99540, 4.5643, 6.3441, 3643.8, 11.3356),
-        DoctorStatisticsAutoAvg(3, Some("Dan"), 451, 264.5, 613.3534, 33.782, 4.6)
+    val objects = List(
+        DoctorStatisticsAutoAvg(1, Some("David"), 450, Some(234), 6453.34, .3, 54.656),
+        DoctorStatisticsAutoAvg(2, Some("Avi"), 99540, None, 6.3441, 3643.8, 11.3356),
+        DoctorStatisticsAutoAvg(3, Some("Dan"), 451, Some(0), 613.3534, 33.782, 4.6)
         )
     
     it should "initial table" in
     {
         val createTableFuture = table.create()
-        waitFor(createTableFuture, 1000)
+        waitFor(createTableFuture, 5000)
     }
     
     it should "be empty" in
@@ -39,7 +39,7 @@ class DoctorStatisticsTableTest extends FlatSpec with Matchers with BeforeAndAft
     {
         val insertFuture = table.insertAll(objects)
         
-        waitFor(insertFuture) shouldEqual objects.length
+        waitFor(insertFuture) shouldEqual Some(objects.length)
     }
     
     it should "select the rows" in

@@ -2,10 +2,10 @@ package controller
 
 import akka.actor.Props
 import model.actors.{ModelManager, MyActor}
-import view.common.actors.ViewManager
-import view.common.traits.MainWindowActions
+import view.common.{MainWindowActions, ViewManager}
 import work.{GetDoctorsStatisticsWork, ReadPastSurgeriesExcelWork, WorkSuccess}
 
+import java.io.File
 import scala.concurrent.ExecutionContext
 
 object Controller
@@ -22,11 +22,6 @@ class Controller(mainWindow : MainWindowActions) extends MyActor
     
     override def receive : Receive =
     {
-//        case message : WorkSuccess =>
-//            m_logger.debug(s"Received message : $message from Model Manager")
-//            m_viewManager ! message
-//            m_modelManager ! GetDoctorsStatisticsWork()
-            
         case message if sender.path.toString.contains("modelManager") =>
             m_logger.debug(s"Received message : $message from Model Manager")
             m_viewManager ! message
@@ -37,7 +32,5 @@ class Controller(mainWindow : MainWindowActions) extends MyActor
         case message => m_logger.error(s"Received message : $message from unknown sender: ${sender.path}")
     }
     
-//    m_modelManager ! ReadPastSurgeriesExcelWork("SurgeriesData.xlsx")
-    m_modelManager ! GetDoctorsStatisticsWork()
-    
+//    m_modelManager ! ReadPastSurgeriesExcelWork(new File("SurgeriesData.xlsx"))
 }

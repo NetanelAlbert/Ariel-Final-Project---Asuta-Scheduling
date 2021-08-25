@@ -12,11 +12,10 @@ import scalafx.scene.layout.HBox
 import scalafx.scene.paint.Color._
 import scalafx.scene.paint.{LinearGradient, Stops}
 import scalafx.scene.text.Text
-import view.common.actors.UserActions
-import view.common.traits.MainWindowActions
+import view.common.MainWindowActions
 import view.mangerStatistics.windowElements.TableScene
 
-object MainWindow extends JFXApp3 with MainWindowActions
+object StatisticsMainWindow extends JFXApp3 with StatisticsMainWindowActions
 {
     override def start()
     {
@@ -39,7 +38,7 @@ object MainWindow extends JFXApp3 with MainWindowActions
         }
     }
     
-    def initializeWithStatisticsData(doctorsBaseStatistics : Seq[DoctorStatistics], surgeryAvgInfoByDoctorMap : Map[Int, Seq[SurgeryAvgInfoByDoctor]], surgeryAvgInfoList : Seq[SurgeryAvgInfo], operationCodeAndNames : Seq[OperationCodeAndName], userActions : UserActions)
+    def initializeWithStatisticsData(doctorsBaseStatistics : Seq[DoctorStatistics], surgeryAvgInfoByDoctorMap : Map[Int, Seq[SurgeryAvgInfoByDoctor]], surgeryAvgInfoList : Seq[SurgeryAvgInfo], operationCodeAndNames : Seq[OperationCodeAndName], userActions : StatisticsUserActions)
     {
         Platform.runLater
         {
@@ -64,27 +63,9 @@ object MainWindow extends JFXApp3 with MainWindowActions
         super.stopApp()
     }
     
-    override def showSuccessDialog(message : String)
-    {
-        Platform.runLater
-        {
-            new Alert(AlertType.Information, message).showAndWait()
-        }
-    }
-    
-    override def showFailDialog(message : String)
-    {
-        Platform.runLater
-        {
-            new Alert(AlertType.Error, message).showAndWait()
-        }
-    }
-    
      def initializeWithScheduleData(futureSurgeryInfo : Iterable[FutureSurgeryInfo])
     {
         // Do nothing
         System.err.println(s"${this.getClass}.initializeWithScheduleData() called, but it should be use only for Scheduling app.")
     }
-    
-    override def initializeWithScheduleData(futureSurgeryInfo : Iterable[FutureSurgeryInfo], userActions : UserActions) : Unit = ???
 }

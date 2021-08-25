@@ -5,7 +5,7 @@ case class DoctorStatistics
     id : Int,
     name : Option[String],
     amountOfData : Int,
-    profitAvg : Double,
+    profit : Option[Int],
     surgeryDurationAvgMinutes : Double,
     restingDurationAvgMinutes : Double,
     hospitalizationDurationAvgHours : Double,
@@ -28,7 +28,7 @@ object DoctorStatisticsAutoAvg
         id : Int,
         name : Option[String],
         amountOfData : Int,
-        profitAvg : Double,
+        profit : Option[Int],
         surgeryDurationAvgMinutes : Double,
         restingDurationAvgMinutes : Double,
         hospitalizationDurationAvgHours : Double,
@@ -38,13 +38,13 @@ object DoctorStatisticsAutoAvg
             id,
             name,
             amountOfData,
-            profitAvg,
+            profit,
             surgeryDurationAvgMinutes,
             restingDurationAvgMinutes,
             hospitalizationDurationAvgHours,
             //TODO :: choose real weights instead of 1
             {
-                profitAvg * 1 +
+                profit.getOrElse(0) * 1 +
                 surgeryDurationAvgMinutes * 1 +
                 restingDurationAvgMinutes * 1 +
                 hospitalizationDurationAvgHours * 1

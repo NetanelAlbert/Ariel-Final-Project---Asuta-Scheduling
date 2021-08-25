@@ -3,24 +3,27 @@ package view.schduling
 import akka.actor.ActorSystem
 import controller.Controller
 import model.DTOs._
+import org.joda.time.{LocalDate, LocalTime}
 import org.joda.time.format.DateTimeFormat
+import scalafx.Includes.jfxDialogPane2sfx
 import scalafx.application.{JFXApp3, Platform}
-import scalafx.geometry.Insets
+import scalafx.geometry.{HPos, Insets, Pos, VPos}
 import scalafx.scene.Scene
-import scalafx.scene.control.Alert
+import scalafx.scene.control.{Alert, ButtonType, Dialog, Label, ListCell, ListView}
 import scalafx.scene.control.Alert.AlertType
-import scalafx.scene.layout.HBox
+import scalafx.scene.layout.{GridPane, HBox}
 import scalafx.scene.paint.Color._
 import scalafx.scene.paint.{LinearGradient, Stops}
 import scalafx.scene.text.Text
-import view.common.actors.UserActions
-import view.common.traits.MainWindowActions
+import view.common.MainWindowActions
+import view.mangerStatistics.StatisticsUserActions
 import view.schduling.windowElements.TableScene
+import work.{BlockFillingOption, GetOptionsForFreeBlockWork}
 
 import java.io.File
 import scala.concurrent.Future
 
-object ScheduleMainWindow extends JFXApp3 with MainWindowActions
+object ScheduleMainWindow extends JFXApp3 with SchedulingMainWindowActions
 {
     override def start()
     {
@@ -40,38 +43,19 @@ object ScheduleMainWindow extends JFXApp3 with MainWindowActions
                 }
             }
         }
-        import scala.concurrent.ExecutionContext.Implicits.global
-        Future
-        { //todo remove block
-            Thread.sleep(2000)
-            val format = DateTimeFormat.forPattern("dd/MM/yyyy HH:mm")
-            val list = List(
-                FutureSurgeryInfo(1.121, 12, format.parseLocalDateTime("16/08/2021 07:30"), format.parseLocalDateTime("16/08/2021 07:30"), 1),
-                FutureSurgeryInfo(2.126, 12, format.parseLocalDateTime("16/08/2021 09:30"), format.parseLocalDateTime("16/08/2021 07:30"), 1),
-                FutureSurgeryInfo(3.152, 13, format.parseLocalDateTime("16/08/2021 12:30"), format.parseLocalDateTime("16/08/2021 07:30"), 1),
-                FutureSurgeryInfo(5.51, 554, format.parseLocalDateTime("16/08/2021 11:30"), format.parseLocalDateTime("16/08/2021 07:30"), 2),
-                FutureSurgeryInfo(76.42, 12, format.parseLocalDateTime("16/08/2021 15:30"), format.parseLocalDateTime("16/08/2021 07:30"), 2),
-                FutureSurgeryInfo(11.2, 322, format.parseLocalDateTime("16/08/2021 07:30"), format.parseLocalDateTime("16/08/2021 07:30"), 2),
-            )
-            println(s"FutureSurgeryInfo list = ${list.mkString("\n")}")
-            initializeWithScheduleData(list, new UserActions
-            {
-                override def loadPastSurgeriesListener(file : File) : Unit = ???
-                
-                override def loadProfitListener(file : File) : Unit = ???
-                
-                override def loadDoctorsIDMappingListener(file : File) : Unit = ???
-                
-                override def loadSurgeryIDMappingListener(file : File) : Unit = ???
-            })
-        }
     }
     
-    override def initializeWithScheduleData(futureSurgeryInfo : Iterable[FutureSurgeryInfo], userActions : UserActions)
+    override def initializeWithData(futureSurgeryInfo : Iterable[FutureSurgeryInfo], blocks : Map[LocalDate, Set[Block]], userActions : SchedulingUserActions)
     {
+        stage.getScene match // TODO - use it to just set data if scene not initialized (null?)
+        {
+            case null => println(s"initializeWithData - null")
+            
+            case scene => println(s"initializeWithData - Other - ${scene.getClass}")
+        }
         Platform.runLater
         {
-            stage.scene = new TableScene(futureSurgeryInfo, stage, userActions)
+            stage.scene = new TableScene(futureSurgeryInfo, blocks, stage, userActions)
             stage.maximized = false
             stage.maximized = true
         }
@@ -82,35 +66,88 @@ object ScheduleMainWindow extends JFXApp3 with MainWindowActions
     
     m_system.registerOnTermination
     {
-        println("ActorSystem is down. App stopped.")
+        println("ActorSystem is down. Stopping app.")
         stopApp()
     }
     
     override def stopApp() : Unit =
     {
+        println("App stopped. Terminating ActorSystem.")
         m_system.terminate()
         super.stopApp()
     }
     
-    override def showSuccessDialog(message : String)
+    override def showOptionsForFreeBlock(work : GetOptionsForFreeBlockWork)
     {
         Platform.runLater
         {
-            new Alert(AlertType.Information, message).showAndWait()
-        }
-    }
+            // demo:
+            //            val message = s"The top options for ${startTime.toString(format)} - ${endTime.toString(format)} are: \n${topOptions.mkString("\n")}"
+            //            new Alert(AlertType.Information, message).showAndWait()
     
-    override def showFailDialog(message : String)
-    {
-        Platform.runLater
-        {
-            new Alert(AlertType.Error, message).showAndWait()
-        }
-    }
     
-    override def initializeWithStatisticsData(doctorsBaseStatistics : Seq[DoctorStatistics], surgeryAvgInfoByDoctorMap : Map[Int, Seq[SurgeryAvgInfoByDoctor]], surgeryAvgInfoList : Seq[SurgeryAvgInfo], operationCodeAndNames : Seq[OperationCodeAndName], userActions : UserActions)
-    {
-        // Do nothing
-        System.err.println("ScheduleMainWindow.initializeWithStatisticsData() called, but it should be use only for Statistics app.")
+            // real:
+            val GetOptionsForFreeBlockWork(startTime, endTime, dayOfWeek, _, _, _, _, _, Some(topOptions)) = work
+            
+            // Labels
+            val descriptionLabel = new Label()
+            {
+                GridPane.setValignment(this, VPos.Top)
+                padding = Insets(0, 0, 0, 50)
+            }
+            val explanationLabel = new Label()
+            {
+                GridPane.setValignment(this, VPos.Top)
+                padding = Insets(0, 0, 0, 50)
+            }
+            
+            // ListView
+            val optionsList = new ListView[BlockFillingOption](topOptions)
+            optionsList.cellFactory = _ =>
+            {
+                new ListCell[BlockFillingOption]
+                {
+                    item.onChange{ (_, _, option) =>
+                    {
+                        if(Option(option).nonEmpty)
+                        {
+                            text = option.doctorName
+                                         .getOrElse(option.doctorId.toString + " (id)") + " - "
+                        }
+                    }}
+                }
+            }
+            optionsList.getSelectionModel.selectedItemProperty.addListener( _ =>
+            {
+                val option = optionsList.selectionModel.apply.getSelectedItem
+                descriptionLabel.text = option.surgeries.mkString("\n")
+                explanationLabel.text = option.explanation
+            })
+            topOptions.headOption.foreach(optionsList.getSelectionModel.select)
+    
+            val dialog = new Dialog[Nothing]()
+            {
+                initOwner(stage)
+                title = "Block Filling Suggestions"
+                //            headerText = "Choose time and room"
+                // Set the button types.
+                dialogPane().buttonTypes = Seq(ButtonType.OK)
+            }
+    
+            val grid = new GridPane()
+            {
+                hgap = 10
+                vgap = 10
+                padding = Insets(20, 10, 10, 10)
+                add(optionsList, 0, 0)
+                add(descriptionLabel, 1, 0)
+                add(explanationLabel, 2, 0)
+            }
+    
+            grid.prefWidth = 1000
+            dialog.dialogPane().setContent(grid)
+    
+            dialog.showAndWait()
+        }
     }
 }

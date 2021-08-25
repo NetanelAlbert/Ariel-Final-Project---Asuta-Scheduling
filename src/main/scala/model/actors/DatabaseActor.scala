@@ -2,11 +2,14 @@ package model.actors
 
 import akka.Done
 import akka.actor.{ActorRef, Props}
-import model.DTOs.{DoctorAvailability, DoctorStatistics, SurgeryAvgInfo, SurgeryAvgInfoByDoctor, SurgeryStatistics}
+import model.DTOs._
 import model.database._
-import work.{GetDoctorsStatisticsWork, GetOptionsForFreeBlockWork, ReadDoctorsMappingExcelWork, ReadPastSurgeriesExcelWork, ReadSurgeryMappingExcelWork, WorkFailure, WorkSuccess}
+import org.joda.time.LocalDate
+import org.joda.time.format.DateTimeFormat
+import work._
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.duration.DurationInt
+import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 object DatabaseActor
@@ -23,35 +26,157 @@ class DatabaseActor(m_controller : ActorRef, m_modelManager : ActorRef)(implicit
     val surgeryAvgInfoByDoctorTable = new SurgeryAvgInfoByDoctorTable(m_db)
     val doctorStatisticsTable = new DoctorStatisticsTable(m_db)
     val doctorAvailabilityTable = new DoctorAvailabilityTable(m_db)
+    val scheduleTable = new ScheduleTable(m_db)
     
     override def preStart()
     {
         super.preStart()
+        
+        val createTables = for
+        {
+            _ <- surgeryStatisticsTable.create()
+            _ <- surgeryAvgInfoTable.create()
+            _ <- surgeryAvgInfoByDoctorTable.create()
+            _ <- doctorStatisticsTable.create()
+            _ <- doctorAvailabilityTable.create()
+            _ <- scheduleTable.create()
+        } yield ()
     
-        surgeryStatisticsTable.create()
-        surgeryAvgInfoTable.create()
-        surgeryAvgInfoByDoctorTable.create()
-        doctorStatisticsTable.create()
-        doctorAvailabilityTable.create()
+        Await.result(createTables, 10 seconds)
     }
     
     override def receive =
     {
-        case work @ ReadPastSurgeriesExcelWork(_, _, Some(surgeryStatistics), Some(surgeryAvgInfo), Some(surgeryAvgInfoByDoctor), Some(doctorStatistics), Some(doctorAvailabilities)) =>
+        case work @ ReadPastSurgeriesExcelWork(_, keepOldMapping, _, Some(surgeryStatistics), Some(surgeryAvgInfo), Some(surgeryAvgInfoByDoctor), Some(doctorStatistics), Some(doctorAvailabilities)) =>
         {
-            readPastSurgeriesExcelWork(work, surgeryStatistics, surgeryAvgInfo, surgeryAvgInfoByDoctor, doctorStatistics, doctorAvailabilities)
+            readPastSurgeriesExcelWork(work, keepOldMapping, surgeryStatistics, surgeryAvgInfo, surgeryAvgInfoByDoctor, doctorStatistics, doctorAvailabilities)
         }
-
+        
         case work : ReadSurgeryMappingExcelWork => readSurgeryMappingExcelWork(work, work.surgeryMapping)
-
+        
         case work : ReadDoctorsMappingExcelWork => readDoctorMappingExcelWork(work, work.doctorMapping)
-
+        
         case work : GetDoctorsStatisticsWork => getDoctorsStatisticsWork(work)
         
-        case work : GetOptionsForFreeBlockWork => getOptionsForFreeBlockWork(work, work.dayOfWeek)
+        case work : GetOptionsForFreeBlockWork => getOptionsForFreeBlockWork(work, work.date)
+        
+        case work @ GetCurrentScheduleWork(from : LocalDate, to : LocalDate, _, _) => getCurrentScheduleWork(work, from, to)
+        
+        case work @ ReadProfitExcelWork(_, Some(surgeriesProfit), Some(doctorsProfit)) => readProfitExcelWork(work, surgeriesProfit, doctorsProfit)
+
+        case work @ ReadFutureSurgeriesExcelWork(_, keepOldMapping, Some(futureSurgeries)) => readFutureSurgeriesExcelWork(work, keepOldMapping, futureSurgeries)
+    
     }
     
-    def getOptionsForFreeBlockWork(work : GetOptionsForFreeBlockWork, dayOfWeek : Int) = ??? // TODO Implement
+    def readFutureSurgeriesExcelWork(work : ReadFutureSurgeriesExcelWork, keepOldMapping : Boolean, futureSurgeries : Iterable[FutureSurgeryInfo])
+    {
+        val remove =
+            if(keepOldMapping)
+            {
+                Future()
+            }
+            else
+            {
+                scheduleTable.clear()
+            }
+            
+        remove.flatMap(_ => scheduleTable.insertAll(futureSurgeries)).onComplete
+        {
+            case Success(_) => m_controller ! WorkSuccess(work, Some("Schedule Read successfully"))
+    
+            case Failure(exception) =>
+            {
+                val info = s"Was not able to write the schedule to DB"
+                m_controller ! WorkFailure(work, Some(exception), Some(info))
+            }
+        }
+    }
+    
+    def readProfitExcelWork(work : ReadProfitExcelWork, surgeriesProfit : Iterable[(Double, Int)], doctorsProfit : Iterable[(Int, Int)])
+    {
+        val surgeriesFuture = surgeryStatisticsTable.setSurgeriesProfit(surgeriesProfit)
+        val doctorsFuture = doctorStatisticsTable.setDoctorsProfit(doctorsProfit)
+        val updates = for
+        {
+            _ <- surgeriesFuture
+            _ <- doctorsFuture
+        } yield Done.done()
+        
+        updates.onComplete
+        {
+            case Success(_) => m_controller ! WorkSuccess(work, Some("Profit Read successfully"))
+            
+            case Failure(exception) =>
+            {
+                val info = s"Was not able to set profit data in DB"
+                m_controller ! WorkFailure(work, Some(exception), Some(info))
+            }
+        }
+    }
+    
+    def getCurrentScheduleWork(work : GetCurrentScheduleWork, from : LocalDate, to : LocalDate)
+    {
+        val getData =for
+        {
+//            blocks <- scheduleTable.selectBlocksByDates(from, to)
+//            schedule <- scheduleTable.selectByDates(from, to)
+            schedule <- scheduleTable.selectAll()
+            blocks = schedule.map(Block.fromFutureSurgery).groupBy(_.day).mapValues(_.toSet)
+        } yield (blocks, schedule)
+        
+        getData.onComplete
+        {
+            case Success((blocks, schedule)) =>
+            {
+                m_controller ! WorkSuccess(work.copy(schedule = Some(schedule),
+                                                     blocks = Some(blocks)),
+                                           Some(s"Successfully got schedule between $from anf $to"))
+            }
+    
+            case Failure(exception) =>
+            {
+                val info = s"Was not able to get schedule from DB"
+                m_controller ! WorkFailure(work, Some(exception), Some(info))
+            }
+        }
+    }
+    
+    def getOptionsForFreeBlockWork(work : GetOptionsForFreeBlockWork, date : LocalDate)
+    {
+        val copyWork = for
+        {
+            availableDoctors <- doctorAvailabilityTable.getAvailableDoctorsIDs(date.getDayOfWeek)
+            doctorsWithSurgeries <- surgeryAvgInfoByDoctorTable.getSurgeriesByDoctors(availableDoctors)
+            
+            doctorMapping <-doctorStatisticsTable.getDoctorMapping(doctorsWithSurgeries.keySet)
+        
+     
+            allSurgeriesID = doctorsWithSurgeries.values.flatten.map(_.operationCode).toSet
+            surgeryStatistics <- surgeryStatisticsTable.getByIDs(allSurgeriesID)
+            surgeryAvgInfo <- surgeryAvgInfoTable.getByIDs(allSurgeriesID)
+            
+            //todo date days from setting, and shrink the default duration
+            // (month is too much if we check every hour)
+            plannedSurgeries <- scheduleTable.selectByDates(date.minusDays(14), date.plusDays(14)).map(_.filter(! _.released))
+     
+        } yield work.copy(doctorsWithSurgeries = Some(doctorsWithSurgeries),
+                          doctorMapping = Some(doctorMapping),
+                          surgeryStatistics = Some(surgeryStatistics),
+                          surgeryAvgInfo = Some(surgeryAvgInfo),
+                          plannedSurgeries = Some(plannedSurgeries))
+        
+        copyWork.onComplete
+        {
+            case Success(workCopy) => m_modelManager ! workCopy // Route to AnalyzeDataActor
+            
+            case Failure(exception) =>
+            {
+                val info = s"Was not able to GetOptionsForFreeBlockWork from DB"
+                m_controller ! WorkFailure(work, Some(exception), Some(info))
+            }
+        }
+        
+    }
     
     def getDoctorsStatisticsWork(work : GetDoctorsStatisticsWork)
     {
@@ -59,7 +184,7 @@ class DatabaseActor(m_controller : ActorRef, m_modelManager : ActorRef)(implicit
         val surgeryAvgInfoByDoctorMapFuture = surgeryAvgInfoByDoctorTable.selectAll()
         val surgeryAvgInfoListFuture = surgeryAvgInfoTable.selectAll()
         val operationCodeAndNamesFuture = surgeryStatisticsTable.getOperationCodeAndNames()
-    
+        
         val workCopyFuture = for
         {
             doctorsBaseStatistics <- doctorsBaseStatisticsFuture
@@ -71,12 +196,12 @@ class DatabaseActor(m_controller : ActorRef, m_modelManager : ActorRef)(implicit
             surgeryAvgInfoByDoctorMap = Some(surgeryAvgInfoByDoctor.groupBy(_.doctorId)),
             surgeryAvgInfoList = Some(surgeryAvgInfoList),
             operationCodeAndNames = Some(operationCodeAndNames)
-        )
+            )
         
         workCopyFuture.onComplete
         {
             case Success(workCopy) => m_controller ! WorkSuccess(workCopy, None)
-
+            
             case Failure(exception) =>
             {
                 val info = s"Was not able to get doctors statistics from DB"
@@ -85,9 +210,10 @@ class DatabaseActor(m_controller : ActorRef, m_modelManager : ActorRef)(implicit
         }
     }
     
-    def readSurgeryMappingExcelWork(work : ReadSurgeryMappingExcelWork, surgeryMapping : Option[Map[Double, Option[String]]])
+    def readSurgeryMappingExcelWork(work : ReadSurgeryMappingExcelWork, surgeryMapping : Option[Map[Double, String]])
     {
-        surgeryMapping match {
+        surgeryMapping match
+        {
             case Some(mapping) =>
             {
                 surgeryStatisticsTable.setSurgeryNames(mapping).onComplete
@@ -97,7 +223,7 @@ class DatabaseActor(m_controller : ActorRef, m_modelManager : ActorRef)(implicit
                         val info = s"Successfully mapped $updated surgeries in the database"
                         m_controller ! WorkSuccess(work, Some(info))
                     }
-    
+                    
                     case Failure(exception) =>
                     {
                         val info = s"Was not able to update surgeryStatisticsTable with the new names"
@@ -105,7 +231,7 @@ class DatabaseActor(m_controller : ActorRef, m_modelManager : ActorRef)(implicit
                     }
                 }
             }
-    
+            
             case None =>
             {
                 val info = s"Got ReadSurgeryMappingExcelWork with an empty map. work: $work"
@@ -114,9 +240,10 @@ class DatabaseActor(m_controller : ActorRef, m_modelManager : ActorRef)(implicit
         }
     }
     
-    def readDoctorMappingExcelWork(work : ReadDoctorsMappingExcelWork, doctorMapping : Option[Map[Int, Option[String]]])
+    def readDoctorMappingExcelWork(work : ReadDoctorsMappingExcelWork, doctorMapping : Option[Map[Int, String]])
     {
-        doctorMapping match {
+        doctorMapping match
+        {
             case Some(mapping) =>
             {
                 doctorStatisticsTable.setDoctorNames(mapping).onComplete
@@ -143,68 +270,56 @@ class DatabaseActor(m_controller : ActorRef, m_modelManager : ActorRef)(implicit
         }
     }
     
-    def readPastSurgeriesExcelWork(work : ReadPastSurgeriesExcelWork, surgeryStatistics : Iterable[SurgeryStatistics], surgeryAvgInfo : Iterable[SurgeryAvgInfo], surgeryAvgInfoByDoctor : Iterable[SurgeryAvgInfoByDoctor], doctorStatistics : Iterable[DoctorStatistics], doctorAvailabilities : Set[DoctorAvailability])
+    def readPastSurgeriesExcelWork(work : ReadPastSurgeriesExcelWork, keepOldMapping : Boolean, surgeryStatistics : Iterable[SurgeryStatistics], surgeryAvgInfo : Iterable[SurgeryAvgInfo], surgeryAvgInfoByDoctor : Iterable[SurgeryAvgInfoByDoctor], doctorStatistics : Iterable[DoctorStatistics], doctorAvailabilities : Set[DoctorAvailability])
     {
-        val mappings = for
+        val actionFuture = for
         {
-            surgeryMapping <- surgeryStatisticsTable.getSurgeryMapping()
-            doctorMapping <- doctorStatisticsTable.getDoctorMapping()
-        } yield (surgeryMapping, doctorMapping)
-        
-        val cleaning = mappings.flatMap(_ =>
-        {
-            val surgeryStatistics = surgeryStatisticsTable.clear()
-            val surgeryAvgInfo = surgeryAvgInfoTable.clear()
-            val surgeryAvgInfoByDoctor = surgeryAvgInfoByDoctorTable.clear()
-            val doctorStatistics = doctorStatisticsTable.clear()
-            val doctorAvailabilities = doctorAvailabilityTable.clear()
+            // Read old maps
+            surgeryMapping <- if(keepOldMapping) surgeryStatisticsTable.getSurgeryMapping() else Future(Map[Double, String]())
+            profitMapping <- if(keepOldMapping) surgeryStatisticsTable.getProfitMapping() else Future(Map[Double, Int]())
+            doctorMapping <- if(keepOldMapping) doctorStatisticsTable.getDoctorMapping() else Future(Map[Int, String]())
             
-            for
-            {
-                _ <- surgeryStatistics
-                _ <- surgeryAvgInfo
-                _ <- surgeryAvgInfoByDoctor
-                _ <- doctorStatistics
-                _ <- doctorAvailabilities
-            } yield Done.done()
-        })
+            
+            // Clean
+            surgeryStatisticsCleaning = surgeryStatisticsTable.clear()
+            surgeryAvgInfoCleaning = surgeryAvgInfoTable.clear()
+            surgeryAvgInfoByDoctorCleaning = surgeryAvgInfoByDoctorTable.clear()
+            doctorStatisticsCleaning = doctorStatisticsTable.clear()
+            doctorAvailabilitiesCleaning = doctorAvailabilityTable.clear()
+            
+            _ <- surgeryStatisticsCleaning
+            _ <- surgeryAvgInfoCleaning
+            _ <- surgeryAvgInfoByDoctorCleaning
+            _ <- doctorStatisticsCleaning
+            _ <- doctorAvailabilitiesCleaning
+            
+            // Insert new data
+            surgeryStatisticsInsert = surgeryStatisticsTable.insertAll(surgeryStatistics)
+            surgeryAvgInfoInsert = surgeryAvgInfoTable.insertAll(surgeryAvgInfo)
+            surgeryAvgInfoByDoctorInsert = surgeryAvgInfoByDoctorTable.insertAll(surgeryAvgInfoByDoctor)
+            doctorStatisticsInsert = doctorStatisticsTable.insertAll(doctorStatistics)
+            doctorAvailabilitiesInsert = doctorAvailabilityTable.insertAll(doctorAvailabilities)
+            
+            _ <- surgeryStatisticsInsert
+            _ <- surgeryAvgInfoInsert
+            _ <- surgeryAvgInfoByDoctorInsert
+            _ <- doctorStatisticsInsert
+            _ <- doctorAvailabilitiesInsert
+            
+            // Map back
+            _ <- surgeryStatisticsTable.setSurgeryNames(surgeryMapping)
+            _ <- surgeryStatisticsTable.setSurgeriesProfit(profitMapping)
+            _ <- doctorStatisticsTable.setDoctorNames(doctorMapping)
+        } yield ()
         
-        val inserting = cleaning.flatMap(_ =>
-        {
-            val surgeryStatisticsFuture = surgeryStatisticsTable.insertAll(surgeryStatistics)
-            val surgeryAvgInfoFuture = surgeryAvgInfoTable.insertAll(surgeryAvgInfo)
-            val surgeryAvgInfoByDoctorFuture = surgeryAvgInfoByDoctorTable.insertAll(surgeryAvgInfoByDoctor)
-            val doctorStatisticsFuture = doctorStatisticsTable.insertAll(doctorStatistics)
-            val doctorAvailabilitiesFuture = doctorAvailabilityTable.insertAll(doctorAvailabilities)
-    
-            for
-            {
-                _ <- surgeryStatisticsFuture
-                _ <- surgeryAvgInfoFuture
-                _ <- surgeryAvgInfoByDoctorFuture
-                _ <- doctorStatisticsFuture
-                _ <- doctorAvailabilitiesFuture
-            } yield Done.done()
-        })
         
-        val mappingBack = inserting.flatMap(_ =>
-        {
-            for
-            {
-                surgeryMapping <- mappings.map(_._1)
-                doctorMapping <- mappings.map(_._2)
-                _ <- surgeryStatisticsTable.setSurgeryNames(surgeryMapping)
-                _ <- doctorStatisticsTable.setDoctorNames(doctorMapping)
-            } yield Done
-        })
-        
-        mappingBack.onComplete
+        actionFuture.onComplete
         {
             case Success(_) =>
             {
                 m_controller ! WorkSuccess(work, Some(s"Successfully load surgery data from ${work.file.getPath}"))
             }
-    
+            
             case Failure(exception) =>
             {
                 val info = "Failed to treat ReadPastSurgeriesExcelWork"

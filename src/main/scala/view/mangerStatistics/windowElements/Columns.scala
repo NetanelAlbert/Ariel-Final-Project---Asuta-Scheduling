@@ -7,7 +7,7 @@ import scalafx.scene.control.TableColumn
 object Columns
 {
     val nameCol = new TableColumn[DoctorStatistics, String]("Doctor Name")
-    val profitAvgCol = new TableColumn[DoctorStatistics, Double]("Average Profit")
+    val profitAvgCol = new TableColumn[DoctorStatistics, Int]("Profit")
     val surgeryDurationAvgMinutesCol = new TableColumn[DoctorStatistics, Double]("Average Surgery Duration (minutes)")
     val restingDurationAvgMinutesCol = new TableColumn[DoctorStatistics, Double]("Average Resting Duration (minutes)")
     val hospitalizationDurationAvgHoursCol = new TableColumn[DoctorStatistics, Double]("Average Hospitalization Duration (hours)")
@@ -50,7 +50,7 @@ object ColumnsNormalNames extends ColumnsNames
 trait ColumnsNames
 {
     def DOC_NAME = "Doctor Name"
-    def AVG_PROFIT = "Average Profit"
+    def AVG_PROFIT = "Profit"
     def AVG_SURGERY = "Average Surgery Duration (minutes)"
     def AVG_RESTING = "Average Resting Duration (minutes)"
     def AVG_HOSPITALIZATION = "Average Hospitalization (hours)"

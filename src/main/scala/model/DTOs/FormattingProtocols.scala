@@ -19,7 +19,7 @@ object FormattingProtocols
     
     implicit val IntegerDistributionMapping = MappedColumnType.base[IntegerDistribution, String](
         distribution => distribution.m_distribution.toList.toJson.toString,
-        mapString => new IntegerDistribution(mapString.toJson.convertTo[List[(Int, Double)]].toMap)
+        mapString => new IntegerDistribution(mapString.parseJson.convertTo[List[(Int, Double)]].toMap)
     )
     
     implicit val DaysMapping = MappedColumnType.base[Days, Int](

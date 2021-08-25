@@ -1,7 +1,7 @@
 package model.actors
 
 import akka.actor.{ActorRef, Props}
-import work.{FileWork, GetDataWork, TellAboutSettingsActorWork}
+import work.{FileWork, GetDataWork, GetOptionsForFreeBlockWork, TellAboutSettingsActorWork}
 
 import scala.concurrent.ExecutionContext
 
@@ -17,6 +17,8 @@ class ModelManager(m_controller : ActorRef)(implicit ec : ExecutionContext) exte
     override def receive : Receive =
     {
         case work : FileWork => m_fileActor ! work
+        
+        case work : GetOptionsForFreeBlockWork if work.surgeryStatistics.nonEmpty => m_analyzeDataActor ! work
         
         case work : GetDataWork => m_databaseActor ! work
     }

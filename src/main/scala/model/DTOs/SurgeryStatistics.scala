@@ -8,5 +8,18 @@ case class SurgeryStatistics
     operationName : Option[String],
     restingDistribution : IntegerDistribution,
     hospitalizationDistribution : IntegerDistribution,
-    profit : Option[Double]
+    profit : Option[Int],
+    amountOfData : Int
 )
+
+object SurgeryStatisticsImplicits
+{
+    implicit class SurgeryStatisticsToSurgeryBasicInfo(surgeryStatistics: SurgeryStatistics)
+    {
+        def basicInfo : SurgeryBasicInfo =
+        {
+            val SurgeryStatistics(operationCode, operationName, _, _, _, _) = surgeryStatistics
+            SurgeryBasicInfo(operationCode, operationName)
+        }
+    }
+}

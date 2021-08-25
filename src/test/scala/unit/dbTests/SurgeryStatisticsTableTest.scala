@@ -19,9 +19,9 @@ class SurgeryStatisticsTableTest extends FlatSpec with Matchers with BeforeAndAf
     val table = new SurgeryStatisticsTable(db)
     
     val objects = List(
-        SurgeryStatistics(1.2, Some("aaa"), IntegerDistribution(Seq(1, 1, 2)), IntegerDistribution(Seq(3, 4, 5)), Some(122)),
-        SurgeryStatistics(1.4, Some("bbb"), IntegerDistribution(Seq(2, 1, 2)), IntegerDistribution(Seq(3, 3, 3)), Some(159)),
-        SurgeryStatistics(3.66, Some("ccc"), IntegerDistribution(Seq(5, 5, 9)), IntegerDistribution(Seq(6, 2, 1)), Some(72.4))
+        SurgeryStatistics(1.2, Some("aaa"), IntegerDistribution(Seq(1, 1, 2)), IntegerDistribution(Seq(3, 4, 5)), Some(122), 432),
+        SurgeryStatistics(1.4, Some("bbb"), IntegerDistribution(Seq(2, 1, 2)), IntegerDistribution(Seq(3, 3, 3)), Some(159), 4334),
+        SurgeryStatistics(3.66, Some("ccc"), IntegerDistribution(Seq(5, 5, 9)), IntegerDistribution(Seq(6, 2, 1)), None, 23)
         )
     
     it should "initial table" in
@@ -40,7 +40,7 @@ class SurgeryStatisticsTableTest extends FlatSpec with Matchers with BeforeAndAf
     {
         val insertFuture = table.insertAll(objects)
         
-        waitFor(insertFuture) shouldEqual objects.length
+        waitFor(insertFuture) shouldEqual Some(objects.length)
     }
     
     it should "select the rows" in
