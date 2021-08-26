@@ -5,7 +5,6 @@ import akka.actor.{ActorRef, Props}
 import model.DTOs._
 import model.database._
 import org.joda.time.LocalDate
-import org.joda.time.format.DateTimeFormat
 import work._
 
 import scala.concurrent.duration.DurationInt
@@ -121,7 +120,14 @@ class DatabaseActor(m_controller : ActorRef, m_modelManager : ActorRef)(implicit
 //            blocks <- scheduleTable.selectBlocksByDates(from, to)
 //            schedule <- scheduleTable.selectByDates(from, to)
             schedule <- scheduleTable.selectAll()
-            blocks = schedule.map(Block.fromFutureSurgery).groupBy(_.day).mapValues(_.toSet)
+            doctorMapping <- doctorStatisticsTable.getDoctorMapping(schedule.map(_.doctorId))
+            blocks = schedule
+                .map(
+                {
+                    surg => Block.fromFutureSurgery(surg, doctorMapping.get(surg.doctorId))
+                })
+                .groupBy(_.day)
+                .mapValues(_.toSet)
         } yield (blocks, schedule)
         
         getData.onComplete

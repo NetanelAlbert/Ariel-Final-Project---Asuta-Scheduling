@@ -2,11 +2,13 @@ package view.schduling.windowElements
 
 import model.DTOs.{Block, FutureSurgeryInfo}
 import org.joda.time.{LocalDate, LocalTime}
+
+import java.time.{LocalDate => JavaLocalDate}
 import scalafx.Includes.jfxDialogPane2sfx
-import scalafx.geometry.Insets
+import scalafx.geometry.{Insets, Pos}
 import scalafx.scene.Scene
-import scalafx.scene.control.{Button, ButtonType, ComboBox, Dialog, Label}
-import scalafx.scene.layout.{GridPane, HBox, Priority, StackPane, VBox}
+import scalafx.scene.control.{Button, ButtonType, ComboBox, DatePicker, Dialog, Label}
+import scalafx.scene.layout.{BorderPane, GridPane, HBox, Priority, StackPane, VBox}
 import scalafx.stage.{Screen, Stage}
 import scalafx.util.StringConverter
 import view.common.UiUtils
@@ -21,13 +23,16 @@ class TableScene(futureSurgeryInfo : Iterable[FutureSurgeryInfo],
 {
     val APP_NAME = "Surgery Scheduling"
     stage.title = APP_NAME
+    val sdf = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")
     
     //todo remove
-    userActions.getSurgeriesSuggestions(LocalTime.now(), LocalTime.now(), LocalDate.now())
+//    userActions.getSurgeriesSuggestions(LocalTime.now(), LocalTime.now(), LocalDate.now())
     
     val table = new DailyTableView(futureSurgeryInfo, blocks)
 //    table.refresh() todo
     
+    
+    // Set Menu Line
     def loadPastSurgeriesAndCall = getPathFromUserAndCall(stage, "Select Past Surgeries File")(_)
     def loadProfitAndCall = getPathFromUserAndCall(stage, "Select Profit File")(_)
     def loadDoctorsIDMappingAndCall = getPathFromUserAndCall(stage, "Select Doctors ID Mapping File")(_)
@@ -42,18 +47,59 @@ class TableScene(futureSurgeryInfo : Iterable[FutureSurgeryInfo],
         loadScheduleListener = _ => loadScheduleAndCall(UiUtils.askIfToKeepMappingAndLoadSchedule(stage, userActions))
         )
     
+    val prevButton = new Button("<")
+    {
+        prefWidth = 150
+        onAction = _ =>
+        {
+            table.dayBefore
+            resetTodayButton()
+        }
+    }
+    
+    val todayPicker = new DatePicker(jodaToJava(table.date))
+    {
+        prefWidth = 500
+        alignmentInParent = Pos.Center
+        
+        onAction = _ =>
+        {
+            table.date = javaToJoda(value.apply)
+            resetTodayButton()
+        }
+    }
+    def resetTodayButton()
+    {
+        todayPicker.value = jodaToJava(table.date)
+    }
+    
+    val nextButton = new Button(">")
+    {
+        prefWidth = 150
+        onAction = _ =>
+        {
+            table.nextDay
+            resetTodayButton()
+        }
+    }
+    
     val suggestionsButton = new Button("Get Suggestions")
     {
         onAction = _ => showGetSuggestionsDialog
         prefWidth = 500
-        margin = Insets(0, 50, 0, 0)
-        style = "-fx-font-weight: bold"
+        margin = Insets(0, 50, 0, 500)
+        style =
+            """-fx-font-weight: bold;
+              |-fx-font-size: 15;""".stripMargin
     }
     
-    val hBox = new HBox(menu, suggestionsButton)
-    HBox.setHgrow(menu, Priority.Always)
-    HBox.setHgrow(suggestionsButton, Priority.Never)
+    menu.prefWidth = 1000
+    val dateHBox = new HBox(prevButton, todayPicker, nextButton)
+//    dateHBox.setAlignment(Pos.Center)
     
+    val hBox = new HBox(menu, dateHBox, suggestionsButton)
+    //    HBox.setHgrow(menu, Priority.Always)
+    //    HBox.setHgrow(suggestionsButton, Priority.Never)
     
     // Create Table
     val stackPane = new StackPane()
@@ -62,6 +108,9 @@ class TableScene(futureSurgeryInfo : Iterable[FutureSurgeryInfo],
     val vBox = new VBox()
     vBox.children = List(hBox, stackPane)
     root = vBox
+    
+    def javaToJoda(localDate : JavaLocalDate) : LocalDate = dateFormat.parseLocalDate(localDate.format(sdf))
+    def jodaToJava(localDate : LocalDate) : JavaLocalDate = JavaLocalDate.parse(localDate.toString(dateFormat), sdf)
     
     
     def showGetSuggestionsDialog

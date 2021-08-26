@@ -1,13 +1,9 @@
 package view.schduling.windowElements
 
 import javafx.collections.{FXCollections, ObservableList}
-import javafx.event.EventHandler
-import javafx.scene.control.SelectionMode
-import javafx.scene.input.ContextMenuEvent
 import model.DTOs.{Block, FutureSurgeryInfo}
 import org.controlsfx.control.spreadsheet.{GridBase, SpreadsheetCell, SpreadsheetCellType, SpreadsheetView}
 import org.joda.time.{LocalDate, LocalTime}
-import org.joda.time.format.DateTimeFormat
 import scalafx.stage.Screen
 
 import scala.collection.JavaConverters.seqAsJavaListConverter
@@ -18,7 +14,7 @@ import common.Utils._
 class DailyTableView(futureSurgeryInfo : Iterable[FutureSurgeryInfo], blocks : Map[LocalDate, Set[Block]]) extends SpreadsheetView
 {
     val operationRooms = 4 //todo by settings
-    private var today = LocalDate.now().minusDays(0)// todo remove minus
+    private var today = LocalDate.now()
     private def todayBlocks = blocks.getOrElse(today, Set[Block]())
     println(s"today = $today")
     println(s"todayBlocks: $todayBlocks")
@@ -45,15 +41,15 @@ class DailyTableView(futureSurgeryInfo : Iterable[FutureSurgeryInfo], blocks : M
         
         grid.setRows(rows)
         this.setGrid(grid)
-    }
     
-    todayBlocks.foreach
-    {
-        block =>
-            val span = spanningForCell(block)
-            val row = block.blockStart.getHourOfDay - dayStart.getHourOfDay
-            val col = block.operationRoom
-            grid.spanRow(span, row, col)
+        todayBlocks.foreach
+        {
+            block =>
+                val span = spanningForCell(block)
+                val row = block.blockStart.getHourOfDay - dayStart.getHourOfDay
+                val col = block.operationRoom
+                grid.spanRow(span, row, col)
+        }
     }
     
     // Set behavior
@@ -78,14 +74,23 @@ class DailyTableView(futureSurgeryInfo : Iterable[FutureSurgeryInfo], blocks : M
         val rowNum = time.getHourOfDay - dayStart.getHourOfDay
         val row : ObservableList[SpreadsheetCell] = FXCollections.observableArrayList()
         
-        row.add(SpreadsheetCellType.STRING.createCell(rowNum, 0, 1, 1, time.toString(timeFormat)))
+        val timeCell = SpreadsheetCellType.STRING.createCell(rowNum, 0, 1, 1, time.toString(timeFormat))
+        timeCell.setStyle("""-fx-font-size: 20;
+                            |-fx-font-weight: bold;
+                            |-fx-alignment: center;""".stripMargin)
+        row.add(timeCell)
         for(room <- 1 to operationRooms)
         {
             val cellValue = surgeryForCell(time, room)
-            val cellValueString = cellValue.map(_.toString).orNull
             val span = cellValue.map(spanningForCell).getOrElse(1)
+            val cellValueString = cellValue.map(_.prettyStringByLines(span)).orNull
             val cell = SpreadsheetCellType.STRING.createCell(rowNum, room, span, 1, cellValueString)
-            cellValue.foreach(_ => cell.setStyle("-fx-background-color: gainsboro"))
+            cellValue.foreach(_ => cell.setStyle(
+                """-fx-background-color: gainsboro;
+                  |-fx-font-size: 23;
+                  |-fx-font-weight: bolder;
+                  |-fx-alignment: center;""".stripMargin))
+            
             row.add(cell)
         }
         row

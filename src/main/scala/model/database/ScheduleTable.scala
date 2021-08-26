@@ -77,11 +77,6 @@ class ScheduleTable(m_db : DatabaseDef)(implicit ex : ExecutionContext) extends 
                                  }))
     }
     
-    def selectBlocksByDates(from : LocalDate, to : LocalDate) : Future[Map[LocalDate, Set[Block]]] =
-    {
-        selectByDates(from, to).map(_.map(Block.fromFutureSurgery).toSet.groupBy(_.day))
-    }
-    
     def clear() : Future[Int] =
     {
         m_db.run(this.delete)

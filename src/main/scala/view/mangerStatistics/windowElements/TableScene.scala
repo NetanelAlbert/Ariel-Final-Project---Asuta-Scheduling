@@ -43,6 +43,8 @@ class TableScene(val doctorsBaseStatistics : Seq[DoctorStatistics],
     table.columns.foreach(_.setPrefWidth(Screen.primary.bounds.width / Columns.columns.size))
     table.prefHeight = Screen.primary.bounds.height
     
+    table.columns.foreach(_.setStyle("-fx-alignment: center;"))
+    
     def loadPastSurgeriesAndCall = getPathFromUserAndCall(stage, "Select Past Surgeries File")(_)
     def loadProfitAndCall = getPathFromUserAndCall(stage, "Select Profit File")(_)
     def loadDoctorsIDMappingAndCall = getPathFromUserAndCall(stage, "Select Doctors ID Mapping File")(_)
