@@ -193,3 +193,9 @@ Project Link: [https://github.com/NetanelAlbert/Ariel-Final-Project---Asuta-Sche
 ## Acknowledgements
 * [GitHub Readme template](https://github.com/othneildrew/Best-README-Template)
 
+
+
+
+[scheduling-screenshot]: src/main/resources/screenshotes/scheduling.png
+[statistics-screenshot]: src/main/resources/screenshotes/statistics.png
+
