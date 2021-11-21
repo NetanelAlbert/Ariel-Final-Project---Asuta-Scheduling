@@ -11,15 +11,6 @@ case class SurgeryStatistics
     profit : Option[Int],
     amountOfData : Int
 )
-
-object SurgeryStatisticsImplicits
 {
-    implicit class SurgeryStatisticsToSurgeryBasicInfo(surgeryStatistics: SurgeryStatistics)
-    {
-        def basicInfo : SurgeryBasicInfo =
-        {
-            val SurgeryStatistics(operationCode, operationName, _, _, _, _) = surgeryStatistics
-            SurgeryBasicInfo(operationCode, operationName)
-        }
-    }
+    def basicInfo : SurgeryBasicInfo = SurgeryBasicInfo(operationCode, operationName)
 }

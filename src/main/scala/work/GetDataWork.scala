@@ -32,6 +32,7 @@ case class GetOptionsForFreeBlockWork
     surgeryStatistics: Option[Seq[SurgeryStatistics]] = None,
     surgeryAvgInfo: Option[Seq[SurgeryAvgInfo]] = None,
     plannedSurgeries : Option[Seq[FutureSurgeryInfo]] = None,
+    plannedSurgeryStatistics : Option[Seq[SurgeryStatistics]] = None,
     topOptions : Option[Seq[BlockFillingOption]] = None,
 ) extends GetDataWork
 
@@ -40,18 +41,16 @@ case class BlockFillingOption
     doctorId : Int,
     doctorName : Option[String],
     surgeries : Seq[SurgeryBasicInfo],
-
     chanceForRestingShort : Double,
     chanceForHospitalizeShort : Double,
-    expectedProfit : Double,
-    windowUtilization : Double,
-    frequency : Int,
+    expectedProfit : Option[Int],
     // TODO find out the relevant fields
 ) extends Ordered[BlockFillingOption]
 {
     require(0 <= chanceForRestingShort && chanceForRestingShort <= 1, "chanceForRestingShort must be in [0-1]")
     require(0 <= chanceForHospitalizeShort && chanceForHospitalizeShort <= 1, "chanceForHospitalizeShort must be in [0-1]")
-    require(0 <= windowUtilization && windowUtilization <= 1, "windowUtilization must be in [0-1]")
+    
+    def nameOrID = doctorName.getOrElse(s"$doctorId (id)")
     
     def totalScore : Int = ??? //todo (val?)
     
@@ -66,9 +65,9 @@ case class BlockFillingOption
           |
           |Chance for resting beds short: \t$chanceForRestingShort
           |Chance for hospitalize beds short: \t$chanceForHospitalizeShort
-          |Expected profit: \t$expectedProfit
-          |Window utilization: \t$windowUtilization
-          |Frequency in the past: \t$frequency
+          |Expected profit: \t${expectedProfit.getOrElse("Unknown")}
           |""".stripMargin
+    
+    def description = "Surgeries: \n\n" + surgeries.map(_.nameOrCode).mkString("- ","\n- ", "")
 }
 

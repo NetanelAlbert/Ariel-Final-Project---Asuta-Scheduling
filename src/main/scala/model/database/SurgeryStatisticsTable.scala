@@ -9,6 +9,7 @@ import slick.lifted.ProvenShape.proveShapeOf
 import slick.lifted.Tag
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success}
 
 
 class SurgeryStatisticsSchema(tag: Tag) extends Table[SurgeryStatistics](tag, "SurgeryStatistics")
@@ -109,9 +110,17 @@ class SurgeryStatisticsTable(m_db : DatabaseDef)(implicit ec : ExecutionContext)
         for{seq <- pairsSeqFuture} yield seq.map(OperationCodeAndName.applyPair)
     }
     
-    def getByIDs(ids : Iterable[Double]) : Future[Seq[SurgeryStatistics]] =
+    def getByIDsAndValidateSize(ids : Iterable[Double]) : Future[Seq[SurgeryStatistics]] =
     {
-        m_db.run(this.filter(_.operationCode inSet ids).result)
+        val idsSet = ids.toSet
+        m_db.run(this.filter(_.operationCode inSet idsSet).result).transform
+        {
+            case Success(statistics) if statistics.size != idsSet.size =>
+            {
+                Failure(new Exception(s"Didn't find all SurgeryStatistics for the requested IDs in DB. requested: $idsSet, found: ${statistics.map(_.operationCode)}"))
+            }
+            case other => other
+        }
     }
     
     def clear() : Future[Int] =

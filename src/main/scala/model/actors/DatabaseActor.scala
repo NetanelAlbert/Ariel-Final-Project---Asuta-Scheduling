@@ -72,7 +72,7 @@ class DatabaseActor(m_controller : ActorRef, m_modelManager : ActorRef)(implicit
         val remove =
             if(keepOldMapping)
             {
-                Future()
+                Future.successful(0)
             }
             else
             {
@@ -151,25 +151,37 @@ class DatabaseActor(m_controller : ActorRef, m_modelManager : ActorRef)(implicit
     {
         val copyWork = for
         {
-            availableDoctors <- doctorAvailabilityTable.getAvailableDoctorsIDs(date.getDayOfWeek)
-            doctorsWithSurgeries <- surgeryAvgInfoByDoctorTable.getSurgeriesByDoctors(availableDoctors)
-            
-            doctorMapping <-doctorStatisticsTable.getDoctorMapping(doctorsWithSurgeries.keySet)
-        
-     
+            // TODO remove plusDays
+            availableDoctorsIDs <- doctorAvailabilityTable.getAvailableDoctorsIDs(date.plusDays(2).getDayOfWeek).flatMap
+            {
+                case result if result.isEmpty =>
+                {
+                    m_logger.warning(s"Didn't find any doctor available in day: ${date.dayOfWeek().getAsText} in table doctorAvailabilityTable for work: $work")
+                    doctorAvailabilityTable.selectAll().map(_.map(_.doctorId))
+                }
+
+                case result => Future.successful(result)
+            }
+            doctorsWithSurgeries <- surgeryAvgInfoByDoctorTable.getSurgeriesByDoctors(availableDoctorsIDs)
+    
+            doctorMapping <- doctorStatisticsTable.getDoctorMapping(doctorsWithSurgeries.keySet)
+    
+    
             allSurgeriesID = doctorsWithSurgeries.values.flatten.map(_.operationCode).toSet
-            surgeryStatistics <- surgeryStatisticsTable.getByIDs(allSurgeriesID)
-            surgeryAvgInfo <- surgeryAvgInfoTable.getByIDs(allSurgeriesID)
-            
+            surgeryStatistics <- surgeryStatisticsTable.getByIDsAndValidateSize(allSurgeriesID)
+            surgeryAvgInfo <- surgeryAvgInfoTable.getByIDsAndValidateSize(allSurgeriesID)
+    
             //todo date days from setting, and shrink the default duration
             // (month is too much if we check every hour)
             plannedSurgeries <- scheduleTable.selectByDates(date.minusDays(14), date.plusDays(14)).map(_.filter(! _.released))
-     
+            plannedSurgeriesIDs = plannedSurgeries.map(_.operationCode).toSet
+            plannedSurgeryStatistics <- surgeryStatisticsTable.getByIDsAndValidateSize(plannedSurgeriesIDs)
         } yield work.copy(doctorsWithSurgeries = Some(doctorsWithSurgeries),
                           doctorMapping = Some(doctorMapping),
                           surgeryStatistics = Some(surgeryStatistics),
                           surgeryAvgInfo = Some(surgeryAvgInfo),
-                          plannedSurgeries = Some(plannedSurgeries))
+                          plannedSurgeries = Some(plannedSurgeries),
+                          plannedSurgeryStatistics = Some(plannedSurgeryStatistics))
         
         copyWork.onComplete
         {

@@ -25,6 +25,8 @@ case class IntegerDistribution(m_distribution: Map[Int, Double]) extends RandomV
         m_distribution.filterKeys(_ <= element).values.sum
     }
     
+    def indicatorLessThenEq(element : Int) : Indicator = new Indicator(cumulativeP(element))
+    
     override def cumulativePRangeExclude(begin : Int, end : Int) : Double=
     {
         m_distribution.filterKeys(x => {begin < x && x < end}).values.sum
@@ -97,6 +99,19 @@ case class IntegerDistribution(m_distribution: Map[Int, Double]) extends RandomV
         }
         IntegerDistribution(map.toMap)
     }
+    
+    /**
+     * Create a new IntegerDistribution with adding a constant value to each of the distribution values without chang the probabilities.
+     * @param number - the value to add.
+     */
+    def + (number : Int) : IntegerDistribution =
+    {
+        val newDistribution = m_distribution.map
+        {
+            case (k, v) => (k + number) -> v
+        }
+        IntegerDistribution(newDistribution)
+    }
 }
 
 object IntegerDistribution
@@ -107,11 +122,11 @@ object IntegerDistribution
         new IntegerDistribution(distribution)
     }
     
-    def apply() = new IntegerDistribution(Map(0 -> 1))
+    def empty() = new IntegerDistribution(Map(0 -> 1))
     
     def sumAndTrim(vars: Seq[IntegerDistribution], length : Int) : IntegerDistribution =
     {
-        vars.par.aggregate(IntegerDistribution())(sumAndTrim(length), sumAndTrim(length))
+        vars.par.aggregate(IntegerDistribution.empty())(sumAndTrim(length), sumAndTrim(length))
     }
     
     def sumAndTrim(m : Int)(dist1 : IntegerDistribution, dist2 : IntegerDistribution): IntegerDistribution =
@@ -120,8 +135,12 @@ object IntegerDistribution
     }
 }
 
-object Indicator
+class Indicator(p : Double) extends IntegerDistribution(Map(1 -> p,
+                                                            0 -> (1 - p)))
 {
-    def apply(p : Double) = new IntegerDistribution(Map(1 -> p,
-                                                        0 -> (1 - p)))
+    def opposite = new Indicator(no)
+    
+    def yes = p(1)
+    
+    def no = p(0)
 }

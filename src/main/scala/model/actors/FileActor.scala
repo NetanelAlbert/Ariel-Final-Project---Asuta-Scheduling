@@ -177,13 +177,13 @@ class FileActor(m_controller : ActorRef,
     {
         Future
         {
-            
-            getSheet(file).map(getPastSurgeryFromRow).flatten
+    
+            getSheet(file).par.flatMap(getPastSurgeryFromRow)
         }.onComplete
         {
             case Success(pastSurgeryInfoIterable) if pastSurgeryInfoIterable.nonEmpty =>
             {
-                m_AnalyzeDataActor ! readPastSurgeriesExcelWork.copy(pasteSurgeries = Some(pastSurgeryInfoIterable))
+                m_AnalyzeDataActor ! readPastSurgeriesExcelWork.copy(pasteSurgeries = Some(pastSurgeryInfoIterable.toList))
             }
             
             case Success(_) =>
@@ -222,14 +222,28 @@ class FileActor(m_controller : ActorRef,
         {
             val operationCode = formatter.formatCellValue(row.getCell(operationCodeIndex)).toDouble
             val doctorId = formatter.formatCellValue(row.getCell(doctorIdIndex)).toInt
-            val surgeryDurationMinutes = minutesDiff(row, surgeryStartIndex, surgeryEndIndex)
-            val restingMinutes = minutesDiff(row, restingStartIndex, restingEndIndex)
-            val hospitalizationHours = hoursDiff(row, restingStartIndex, releaseDateIndex)
+            val surgeryDurationMinutes = minutesDiff(row, surgeryStartIndex, surgeryEndIndex, "surgeryDurationMinutes")
+            val restingMinutes = minutesDiff(row, restingStartIndex, restingEndIndex, "restingMinutes")
+            val hospitalizationHours = hoursDiff(row, restingStartIndex, releaseDateIndex, "hospitalizationHours")
             
             val blockStartString = formatter.formatCellValue(row.getCell(blockStartIndex))
             val blockStart = dateTimeFormat.parseLocalDateTime(blockStartString)
             val blockEndString = formatter.formatCellValue(row.getCell(blockEndIndex))
             val blockEnd = dateTimeFormat.parseLocalDateTime(blockEndString)
+            
+//            println(
+//                s"""NA:: getPastSurgeryFromRow()
+//                   |operationCode = $operationCode
+//                   |doctorId = $doctorId
+//                   |surgeryDurationMinutes = $surgeryDurationMinutes
+//                   |restingMinutes = $restingMinutes
+//                   |hospitalizationHours = $hospitalizationHours
+//                   |
+//                   |blockStartString = $blockStartString
+//                   |blockStart = $blockStart
+//                   |blockEndString = $blockEndString
+//                   |blockEnd = $blockEnd
+//                   |""".stripMargin)
             
             PastSurgeryInfo(operationCode,
                             doctorId,
@@ -251,7 +265,10 @@ class FileActor(m_controller : ActorRef,
             val doctorId = formatter.formatCellValue(row.getCell(doctorIdIndex)).toInt
             val plannedStart = dateTimeFormat.parseLocalDateTime(formatter.formatCellValue(row.getCell(plannedStartIndex)))
             val operationRoom = formatter.formatCellValue(row.getCell(operationRoomIndex)).toInt
-            val released = formatter.formatCellValue(row.getCell(releasedIndex)).nonEmpty
+            val released = Try
+            {
+                dateTimeFormat.parseLocalDateTime(formatter.formatCellValue(row.getCell(releasedIndex)))
+            }.isSuccess
             val blockStart = dateTimeFormat.parseLocalTime(formatter.formatCellValue(row.getCell(blockStartIndex)))
             val blockEnd = dateTimeFormat.parseLocalTime(formatter.formatCellValue(row.getCell(blockEndIndex)))
             
@@ -269,11 +286,11 @@ class FileActor(m_controller : ActorRef,
         trying.toOption
     }
     
-    def minutesDiff = dateDiff((start, end) => Minutes.minutesBetween(start, end).getMinutes)(_, _, _)
-    def hoursDiff = dateDiff((start, end) => Hours.hoursBetween(start, end).getHours)(_, _, _)
+    def minutesDiff = dateDiff((start, end) => Minutes.minutesBetween(start, end).getMinutes)(_, _, _, _)
+    def hoursDiff = dateDiff((start, end) => Hours.hoursBetween(start, end).getHours)(_, _, _, _)
     
     
-    def dateDiff(diff : (LocalDateTime, LocalDateTime) => Int)(row : Row, startIndex : Int, endIndex : Int) : Int =
+    def dateDiff(diff : (LocalDateTime, LocalDateTime) => Int)(row : Row, startIndex : Int, endIndex : Int, description : String) : Int =
     {
         val startString = formatter.formatCellValue(row.getCell(startIndex))
         val endString = formatter.formatCellValue(row.getCell(endIndex))
@@ -281,6 +298,7 @@ class FileActor(m_controller : ActorRef,
         val start = dateTimeFormat.parseLocalDateTime(startString)
         val end = dateTimeFormat.parseLocalDateTime(endString)
         
+//        println(s"NA:: dateDiff() for $description: start ($startIndex): $startString, end ($endIndex): $endString")
         diff(start, end)
     }
     

@@ -9,7 +9,7 @@ class IntegerDistributionTest extends FlatSpec with Matchers with BeforeAndAfter
 {
     "IntegerDistribution" should "Create an empty distribution" in
     {
-        val dist = IntegerDistribution()
+        val dist = IntegerDistribution.empty()
         
         dist.support shouldBe Set(0)
         dist.p(0) shouldBe 1
@@ -60,7 +60,7 @@ class IntegerDistributionTest extends FlatSpec with Matchers with BeforeAndAfter
                       3 -> 3.0 / 8)
         val dist = IntegerDistribution(map)
         
-        val sumWithEmpty = dist + IntegerDistribution()
+        val sumWithEmpty = dist + IntegerDistribution.empty()
         sumWithEmpty shouldBe dist
     }
     

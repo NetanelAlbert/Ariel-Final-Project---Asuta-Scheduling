@@ -81,13 +81,7 @@ object ScheduleMainWindow extends JFXApp3 with SchedulingMainWindowActions
     {
         Platform.runLater
         {
-            // demo:
-            //            val message = s"The top options for ${startTime.toString(format)} - ${endTime.toString(format)} are: \n${topOptions.mkString("\n")}"
-            //            new Alert(AlertType.Information, message).showAndWait()
-    
-    
-            // real:
-            val GetOptionsForFreeBlockWork(startTime, endTime, dayOfWeek, _, _, _, _, _, Some(topOptions)) = work
+            val GetOptionsForFreeBlockWork(startTime, endTime, dayOfWeek, _, _, _, _, _, _, Some(topOptions)) = work
             
             // Labels
             val descriptionLabel = new Label()
@@ -111,8 +105,7 @@ object ScheduleMainWindow extends JFXApp3 with SchedulingMainWindowActions
                     {
                         if(Option(option).nonEmpty)
                         {
-                            text = option.doctorName
-                                         .getOrElse(option.doctorId.toString + " (id)") + " - "
+                            text = option.nameOrID
                         }
                     }}
                 }
@@ -120,7 +113,7 @@ object ScheduleMainWindow extends JFXApp3 with SchedulingMainWindowActions
             optionsList.getSelectionModel.selectedItemProperty.addListener( _ =>
             {
                 val option = optionsList.selectionModel.apply.getSelectedItem
-                descriptionLabel.text = option.surgeries.mkString("\n")
+                descriptionLabel.text = option.description
                 explanationLabel.text = option.explanation
             })
             topOptions.headOption.foreach(optionsList.getSelectionModel.select)

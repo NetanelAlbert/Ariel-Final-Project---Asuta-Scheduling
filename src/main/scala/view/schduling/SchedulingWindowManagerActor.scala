@@ -49,9 +49,18 @@ trait SchedulingUserActions extends CommonUserActions
 {
     this : MyActor =>
 
-    def getSurgeriesSuggestions(startTime : LocalTime, endTime : LocalTime, date : LocalDate) : Unit = m_controller ! GetOptionsForFreeBlockWork(startTime, endTime, date)
+    def getSurgeriesSuggestions(startTime : LocalTime, endTime : LocalTime, date : LocalDate)
+    {
+        m_controller ! GetOptionsForFreeBlockWork(startTime, endTime, date)
+    }
     
-    def getCurrentSchedule(from : LocalDate, to : LocalDate) : Unit = m_controller ! GetCurrentScheduleWork(from, to)
+    def getCurrentSchedule(from : LocalDate, to : LocalDate)
+    {
+        m_controller ! GetCurrentScheduleWork(from, to)
+    }
     
-    def loadScheduleListener(file : File, keepOldMapping : Boolean) : Unit = m_controller ! ReadFutureSurgeriesExcelWork(file, keepOldMapping)
+    def loadScheduleListener(file : File, keepOldMapping : Boolean)
+    {
+        m_controller ! ReadFutureSurgeriesExcelWork(file, keepOldMapping)
+    }
 }

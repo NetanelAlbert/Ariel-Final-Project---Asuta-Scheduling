@@ -6,7 +6,6 @@ trait Work
 
 case class WorkSuccess(work: Work, message : Option[String])(implicit m_logger : LoggingAdapter)
 {
-    //m_logger.info(toString)
     m_logger.info(s"WorkSuccess(work.Class = ${work.getClass}, message = $message)")
     
 }
