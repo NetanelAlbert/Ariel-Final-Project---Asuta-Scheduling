@@ -15,7 +15,7 @@ object FormattingProtocols
     import spray.json._
     
     
-    implicit val DoctorStatisticsFormat = jsonFormat8(DoctorStatistics.apply)
+    implicit val DoctorStatisticsFormat = jsonFormat7(DoctorStatistics.apply)
     
     implicit val IntegerDistributionMapping = MappedColumnType.base[IntegerDistribution, String](
         distribution => distribution.m_distribution.toList.toJson.toString,

@@ -28,8 +28,6 @@ class DoctorStatisticsSchema(tag: Tag) extends Table[DoctorStatistics](tag, "Doc
     
     def hospitalizationDurationAvgHours = column[Double]("hospitalizationDurationAvgHours")
     
-    def globalAvg = column[Double]("globalAvg")
-    
     def columns = (
         id,
         name,
@@ -38,7 +36,7 @@ class DoctorStatisticsSchema(tag: Tag) extends Table[DoctorStatistics](tag, "Doc
         surgeryDurationAvgMinutes,
         restingDurationAvgMinutes,
         hospitalizationDurationAvgHours,
-        globalAvg)
+        )
     
     override def * = columns.mapTo[DoctorStatistics]
 }

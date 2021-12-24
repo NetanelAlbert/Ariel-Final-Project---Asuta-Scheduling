@@ -1,7 +1,7 @@
 package view.schduling.windowElements
 
 import javafx.collections.{FXCollections, ObservableList}
-import model.DTOs.{Block, FutureSurgeryInfo}
+import model.DTOs.{Block, FutureSurgeryInfo, Settings}
 import org.controlsfx.control.spreadsheet.{GridBase, SpreadsheetCell, SpreadsheetCellType, SpreadsheetView}
 import org.joda.time.{LocalDate, LocalTime}
 import scalafx.stage.Screen
@@ -11,9 +11,9 @@ import scala.collection.convert.ImplicitConversions.`collection AsScalaIterable`
 import common.Utils._
 
 
-class DailyTableView(futureSurgeryInfo : Iterable[FutureSurgeryInfo], blocks : Map[LocalDate, Set[Block]]) extends SpreadsheetView
+class DailyTableView(futureSurgeryInfo : Iterable[FutureSurgeryInfo], blocks : Map[LocalDate, Set[Block]], settings : Settings) extends SpreadsheetView
 {
-    val operationRooms = 4 //todo by settings
+    val operationRooms = settings.numberOfOperationRooms
     private var today = LocalDate.now()
     private def todayBlocks = blocks.getOrElse(today, Set[Block]())
     println(s"today = $today")

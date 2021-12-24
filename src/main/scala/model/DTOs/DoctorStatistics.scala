@@ -9,47 +9,22 @@ case class DoctorStatistics
     surgeryDurationAvgMinutes : Double,
     restingDurationAvgMinutes : Double,
     hospitalizationDurationAvgHours : Double,
-    globalAvg : Double
 )
 {
     def nameOrId : String = name.getOrElse(s"$id (id)")
+    
+    def globalAvg(settings : Settings) : Double =
+    {
+        surgeryDurationAvgMinutes * settings.doctorRankingSurgeryTimeWeight +
+        restingDurationAvgMinutes * settings.doctorRankingRestingTimeWeight +
+        hospitalizationDurationAvgHours * settings.doctorRankingHospitalizationTimeWeight +
+        profit.getOrElse(0) * settings.doctorRankingProfitWeight
+    }
 }
 
 object DoctorStatistics
 {
     val tupled = (this.apply _).tupled
-}
-
-object DoctorStatisticsAutoAvg
-{
-    // To compute "globalAvg" auto, but still enable json formatting
-    def apply
-    (
-        id : Int,
-        name : Option[String],
-        amountOfData : Int,
-        profit : Option[Int],
-        surgeryDurationAvgMinutes : Double,
-        restingDurationAvgMinutes : Double,
-        hospitalizationDurationAvgHours : Double,
-    ) : DoctorStatistics =
-    {
-        DoctorStatistics(
-            id,
-            name,
-            amountOfData,
-            profit,
-            surgeryDurationAvgMinutes,
-            restingDurationAvgMinutes,
-            hospitalizationDurationAvgHours,
-            //TODO :: choose real weights instead of 1
-            {
-                profit.getOrElse(0) * 1 +
-                surgeryDurationAvgMinutes * 1 +
-                restingDurationAvgMinutes * 1 +
-                hospitalizationDurationAvgHours * 1
-            })
-    }
 }
 
 case class HourOfWeek(day : Int, hour : Int)

@@ -5,7 +5,7 @@ import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 import scala.concurrent.ExecutionContext
 import scala.language.postfixOps
 import Utils._
-import model.DTOs.DoctorStatisticsAutoAvg
+import model.DTOs.DoctorStatistics
 import model.database.{DBConnection, DoctorStatisticsTable}
 
 
@@ -18,9 +18,9 @@ class DoctorStatisticsTableTest extends FlatSpec with Matchers with BeforeAndAft
     val table = new DoctorStatisticsTable(db)
     
     val objects = List(
-        DoctorStatisticsAutoAvg(1, Some("David"), 450, Some(234), 6453.34, .3, 54.656),
-        DoctorStatisticsAutoAvg(2, Some("Avi"), 99540, None, 6.3441, 3643.8, 11.3356),
-        DoctorStatisticsAutoAvg(3, Some("Dan"), 451, Some(0), 613.3534, 33.782, 4.6)
+        DoctorStatistics(1, Some("David"), 450, Some(234), 6453.34, .3, 54.656),
+        DoctorStatistics(2, Some("Avi"), 99540, None, 6.3441, 3643.8, 11.3356),
+        DoctorStatistics(3, Some("Dan"), 451, Some(0), 613.3534, 33.782, 4.6)
         )
     
     it should "initial table" in

@@ -1,5 +1,6 @@
 package view.schduling.windowElements
 
+import common.Utils
 import model.DTOs.{Block, FutureSurgeryInfo}
 import org.joda.time.{LocalDate, LocalTime}
 
@@ -16,6 +17,9 @@ import view.common.UiUtils.{askIfToKeepMappingAndLoadPastSurgeries, getPathFromU
 import view.schduling.SchedulingUserActions
 import common.Utils._
 
+import scala.concurrent.Await
+import scala.concurrent.duration.DurationInt
+
 class TableScene(futureSurgeryInfo : Iterable[FutureSurgeryInfo],
                  blocks : Map[LocalDate, Set[Block]],
                  stage : Stage,
@@ -23,12 +27,13 @@ class TableScene(futureSurgeryInfo : Iterable[FutureSurgeryInfo],
 {
     val APP_NAME = "Surgery Scheduling"
     stage.title = APP_NAME
-    val sdf = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")
+    val m_sdf = Utils.javaDateFormat
+    val m_settings = Await.result(userActions.getSettings, 5 seconds)
     
     //todo remove
 //    userActions.getSurgeriesSuggestions(LocalTime.now(), LocalTime.now(), LocalDate.now())
     
-    val table = new DailyTableView(futureSurgeryInfo, blocks)
+    val m_table = new DailyTableView(futureSurgeryInfo, blocks, m_settings)
 //    table.refresh() todo
     
     
@@ -52,25 +57,25 @@ class TableScene(futureSurgeryInfo : Iterable[FutureSurgeryInfo],
         prefWidth = 150
         onAction = _ =>
         {
-            table.dayBefore
+            m_table.dayBefore
             resetTodayButton()
         }
     }
     
-    val todayPicker = new DatePicker(jodaToJava(table.date))
+    val todayPicker = new DatePicker(jodaToJava(m_table.date))
     {
         prefWidth = 500
         alignmentInParent = Pos.Center
         
         onAction = _ =>
         {
-            table.date = javaToJoda(value.apply)
+            m_table.date = javaToJoda(value.apply)
             resetTodayButton()
         }
     }
     def resetTodayButton()
     {
-        todayPicker.value = jodaToJava(table.date)
+        todayPicker.value = jodaToJava(m_table.date)
     }
     
     val nextButton = new Button(">")
@@ -78,7 +83,7 @@ class TableScene(futureSurgeryInfo : Iterable[FutureSurgeryInfo],
         prefWidth = 150
         onAction = _ =>
         {
-            table.nextDay
+            m_table.nextDay
             resetTodayButton()
         }
     }
@@ -103,20 +108,20 @@ class TableScene(futureSurgeryInfo : Iterable[FutureSurgeryInfo],
     
     // Create Table
     val stackPane = new StackPane()
-    stackPane.getChildren.add(table)
+    stackPane.getChildren.add(m_table)
     stackPane.prefHeight = Screen.primary.bounds.height
     val vBox = new VBox()
     vBox.children = List(hBox, stackPane)
     root = vBox
     
-    def javaToJoda(localDate : JavaLocalDate) : LocalDate = dateFormat.parseLocalDate(localDate.format(sdf))
-    def jodaToJava(localDate : LocalDate) : JavaLocalDate = JavaLocalDate.parse(localDate.toString(dateFormat), sdf)
+    def javaToJoda(localDate : JavaLocalDate) : LocalDate = dateFormat.parseLocalDate(localDate.format(m_sdf))
+    def jodaToJava(localDate : LocalDate) : JavaLocalDate = JavaLocalDate.parse(localDate.toString(dateFormat), m_sdf)
     
     
     def showGetSuggestionsDialog
     {
         // TODO get values from table selection items
-        val hours = table.workingHours
+        val hours = m_table.workingHours
         val from = hours.head
         val to = from.plusHours(3)
     
@@ -169,7 +174,7 @@ class TableScene(futureSurgeryInfo : Iterable[FutureSurgeryInfo],
         val result = dialog.showAndWait()
     
         result match {
-            case Some(Result(from, to)) => userActions.getSurgeriesSuggestions(from, to, table.date)
+            case Some(Result(from, to)) => userActions.getSurgeriesSuggestions(from, to, m_table.date)
             case _ => // Do nothing
         }
     }

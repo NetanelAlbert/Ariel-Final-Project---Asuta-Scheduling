@@ -10,10 +10,33 @@ case class SurgeryAvgInfoByDoctor
     hospitalizationDurationAvgHours : Double
 )
 {
+    private var weightCache : Option[Int] = None
     //TODO use also the global avg in case of not enough data
-    def weight : Int = surgeryDurationAvgMinutes.toInt + prepareTime
+    def weight(settings : Settings) : Int =
+    {
+        weightCache match
+        {
+            case Some(value) => value
+            
+            case None =>
+            {
+                val weight = surgeryDurationAvgMinutes.toInt + prepareTime(settings)
+                weightCache = Some(weight)
+                weight
+            }
+        }
+    }
     
-    def prepareTime : Int = if(surgeryDurationAvgMinutes < 2*60) 15 else 30 //TODO user settings
+    def prepareTime(settings : Settings) : Int =
+    {
+        if (surgeryDurationAvgMinutes < settings.longSurgeryDefinitionMinutes)
+        {
+            settings.shortSurgeryPrepareTimeMinutes
+        } else
+        {
+            settings.longSurgeryPrepareTimeMinutes
+        }
+    }
     
-    def value : Int = amountOfData // todo - profit might be irrelevant and might pun weights on them
+    def value : Int = amountOfData
 }

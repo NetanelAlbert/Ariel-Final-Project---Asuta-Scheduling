@@ -12,5 +12,3 @@ case class RemoveDoctorAvailabilityWork(doctorAvailability : DoctorAvailability)
 case class GiveMeSettingsWork(responseTo : Option[ActorRef] = None, settingsOption: Option[Settings] = None) extends SettingsWork
 
 case class SetSettingsWork(settings: Settings) extends SettingsWork
-
-case class TellAboutSettingsActorWork(settingsActor : ActorRef) extends Work

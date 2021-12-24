@@ -47,8 +47,8 @@ case class BlockFillingOption
     // TODO find out the relevant fields
 ) extends Ordered[BlockFillingOption]
 {
-    require(0 <= chanceForRestingShort && chanceForRestingShort <= 1, "chanceForRestingShort must be in [0-1]")
-    require(0 <= chanceForHospitalizeShort && chanceForHospitalizeShort <= 1, "chanceForHospitalizeShort must be in [0-1]")
+    require(0 <= chanceForRestingShort && chanceForRestingShort <= 1, s"chanceForRestingShort must be in [0-1], but it's: $chanceForRestingShort")
+    require(0 <= chanceForHospitalizeShort && chanceForHospitalizeShort <= 1, s"chanceForHospitalizeShort must be in [0-1], but its: $chanceForHospitalizeShort")
     
     def nameOrID = doctorName.getOrElse(s"$doctorId (id)")
     

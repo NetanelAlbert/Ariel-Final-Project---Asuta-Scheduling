@@ -8,7 +8,7 @@ import org.joda.time.{Duration, LocalDate, LocalDateTime, LocalTime}
 import work.{BlockFillingOption, GetOptionsForFreeBlockWork, ReadPastSurgeriesExcelWork, WorkFailure, WorkSuccess}
 
 import scala.concurrent.duration.{DurationInt, DurationLong, FiniteDuration}
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
 object AnalyzeDataActor
@@ -18,7 +18,7 @@ object AnalyzeDataActor
 
 class AnalyzeDataActor(m_controller : ActorRef,
                        m_modelManager : ActorRef,
-                       m_databaseActor : ActorRef)(implicit c : ExecutionContext) extends MyActor
+                       m_databaseActor : ActorRef)(implicit override val ec : ExecutionContext) extends MyActor with SettingsAccess
 {
     
     override def receive =
@@ -39,12 +39,14 @@ class AnalyzeDataActor(m_controller : ActorRef,
                                    endTime : LocalTime,
                                    date : LocalDate)
     {
+        // TODO remove Await - use for comprehension for all the function
+        val settings = Await.result(getSettings, 5 second)
         val startFunctionTime = new LocalTime()
         m_logger.info("Starting AnalyzeDataActor.getOptionsForFreeBlockWork")
-        val totalNumberOfRestingBeds = 30 // todo settings
-        val totalNumberOfHospitalizeBeds = 30 // todo settings
-        val distributionMaxLength = 20 // todo change 20 to number of bed? And move to settings
-        val numberOfJumps = 20
+        val totalNumberOfRestingBeds = settings.totalNumberOfRestingBeds
+        val totalNumberOfHospitalizeBeds = settings.totalNumberOfHospitalizeBeds
+        val distributionMaxLength = settings.distributionMaxLength
+        val numberOfJumps = settings.numberOfPointsToLookForShortage
     
         def plannedSurgeriesDistributions(maxValue : Int, numberOfSteps : Int, distribution : SurgeryStatistics => IntegerDistribution, unit : FiniteDuration => Long) : Map[Int, IntegerDistribution] =
         {
@@ -86,7 +88,7 @@ class AnalyzeDataActor(m_controller : ActorRef,
         }
         
         val windowSizeMinutes = (endTime.getMillisOfDay - startTime.getMillisOfDay).millis.toMinutes.toInt
-        val doctorsSacks = doctorsWithSurgeries.values.par.map(knapsack(_, windowSizeMinutes))
+        val doctorsSacks = doctorsWithSurgeries.values.par.map(knapsack(_, windowSizeMinutes, settings))
     
         val operationToSurgeryBasicInfoMapping = surgeryStatistics.map(surgery => surgery.operationCode -> surgery.basicInfo).toMap
         val operationToProfitMapping = surgeryStatistics.map(surgery => surgery.operationCode -> surgery.profit).toMap
@@ -96,7 +98,7 @@ class AnalyzeDataActor(m_controller : ActorRef,
         
         if(doctorsSacks.exists(_.nonEmpty))
         {
-            val options = doctorsSacks.filter(_.nonEmpty).take(3).par.map
+            val options = doctorsSacks.filter(_.nonEmpty).par.map
             {
                 surgeryAvgInfoByDoctorSeq =>
                 {
@@ -106,7 +108,7 @@ class AnalyzeDataActor(m_controller : ActorRef,
                     {
                         case (i, distribution) =>
                         {
-                            val newSurgeriesRestingBedsDistribution = IntegerDistribution.sumAndTrim(newSurgeriesRestingDistributions.map(_ + i), distributionMaxLength)
+                            val newSurgeriesRestingBedsDistribution = IntegerDistribution.sumAndTrim(newSurgeriesRestingDistributions.map(_.+(i).indicatorLessThenEq(i).opposite), distributionMaxLength)
                             IntegerDistribution.sumAndTrim(distributionMaxLength)(distribution, newSurgeriesRestingBedsDistribution)
                         }
                     }
@@ -118,7 +120,7 @@ class AnalyzeDataActor(m_controller : ActorRef,
                     {
                         case (i, distribution) =>
                         {
-                            val newSurgeriesHospitalizeBedsDistribution = IntegerDistribution.sumAndTrim(newSurgeriesHospitalizationDistributions.map(_ + i), distributionMaxLength)
+                            val newSurgeriesHospitalizeBedsDistribution = IntegerDistribution.sumAndTrim(newSurgeriesHospitalizationDistributions.map(_.+(i).indicatorLessThenEq(i).opposite), distributionMaxLength)
                             IntegerDistribution.sumAndTrim(distributionMaxLength)(distribution, newSurgeriesHospitalizeBedsDistribution)
                         }
                     }
@@ -137,8 +139,8 @@ class AnalyzeDataActor(m_controller : ActorRef,
                         {
                             operationToSurgeryBasicInfoMapping(surgery.operationCode)
                         }),
-                        chanceForRestingShort = chanceForRestingShort,
-                        chanceForHospitalizeShort = chanceForHospitalizeShort,
+                        chanceForRestingShort = round(chanceForRestingShort, 2),
+                        chanceForHospitalizeShort = round(chanceForHospitalizeShort, 2),
                         expectedProfit = expectedProfitTry.toOption
                         )
                 }
@@ -150,12 +152,14 @@ class AnalyzeDataActor(m_controller : ActorRef,
         {
             m_controller ! WorkFailure(work, None, Some("All of the doctors optional surgeries was empty"))
         }
+        
+        //todo remove duration - for debugging
         val duration = new Duration(startFunctionTime.toDateTimeToday, new LocalTime().toDateTimeToday)
         m_logger.info("Ending AnalyzeDataActor.getOptionsForFreeBlockWork")
         m_logger.info(s"Duration: $duration")
     }
     
-    def knapsack(surgeries : Seq[SurgeryAvgInfoByDoctor], W : Int) : Seq[SurgeryAvgInfoByDoctor] =
+    def knapsack(surgeries : Seq[SurgeryAvgInfoByDoctor], W : Int, settings: Settings) : Seq[SurgeryAvgInfoByDoctor] =
     {
         if(surgeries.isEmpty) return Nil
         
@@ -164,13 +168,13 @@ class AnalyzeDataActor(m_controller : ActorRef,
         
         for(w <- 1 to W)
         {
-            val smallEnoughSurgeries = surgeries.filter(_.weight <= w)
+            val smallEnoughSurgeries = surgeries.filter(_.weight(settings) <= w)
             if(smallEnoughSurgeries.nonEmpty)
             {
-                val options = smallEnoughSurgeries.map(surg => surg.value + m(w - surg.weight) -> surg).toMap
+                val options = smallEnoughSurgeries.map(surg => surg.value + m(w - surg.weight(settings)) -> surg).toMap
                 val best = options(options.keys.max)
-                m(w) = best.value + m(w - best.weight)
-                sacks(w) = sacks(w - best.weight) :+ best
+                m(w) = best.value + m(w - best.weight(settings))
+                sacks(w) = sacks(w - best.weight(settings)) :+ best
             }
         }
         
@@ -180,11 +184,13 @@ class AnalyzeDataActor(m_controller : ActorRef,
     
     def getDoctorAvailability(pasteSurgeries : Iterable[PastSurgeryInfo]) : Future[Set[DoctorAvailability]] =
     {
-        Future
+        for
         {
-            val threshold = LocalDateTime.now().minusYears(4) // TODO set in settings
-            pasteSurgeries.filter(_.blockStart.isAfter(threshold)).map(surgery => DoctorAvailability(surgery.doctorId, surgery.blockStart.getDayOfWeek)).toSet
-        }
+            settings <- getSettings
+            monthsToGoBack = settings.doctorAvailabilityMonthsToGoBack
+            threshold = LocalDateTime.now().minusMonths(monthsToGoBack)
+            doctorAvailability = pasteSurgeries.filter(_.blockStart.isAfter(threshold)).map(surgery => DoctorAvailability(surgery.doctorId, surgery.blockStart.getDayOfWeek)).toSet
+        } yield  doctorAvailability
     }
     
     def readPastSurgeriesExcelWork(readPastSurgeriesExcelWork : ReadPastSurgeriesExcelWork, pasteSurgeriesOption : Option[Iterable[PastSurgeryInfo]]) = pasteSurgeriesOption match
@@ -293,7 +299,7 @@ class AnalyzeDataActor(m_controller : ActorRef,
                     val restingDurationAvgMinutes = resting.toDouble / amountOfData
                     val hospitalizationDurationAvgHours = hospitalization.toDouble / amountOfData
                     
-                    DoctorStatisticsAutoAvg(
+                    DoctorStatistics(
                         id,
                         name = None,
                         amountOfData,
@@ -343,4 +349,15 @@ class AnalyzeDataActor(m_controller : ActorRef,
     }
     
     def average(iterable : Iterable[Int]) : Double = iterable.sum.toDouble / iterable.size
+    
+    def round(value : Double, places : Int) : Double =
+    {
+        if (places < 0)
+            throw new IllegalArgumentException
+        
+        val factor = Math.pow(10, places).toLong
+        val factoredValue = value * factor
+        val tmp = factoredValue.round
+        tmp.toDouble / factor
+    }
 }

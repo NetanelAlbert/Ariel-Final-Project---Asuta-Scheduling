@@ -47,12 +47,6 @@ object ScheduleMainWindow extends JFXApp3 with SchedulingMainWindowActions
     
     override def initializeWithData(futureSurgeryInfo : Iterable[FutureSurgeryInfo], blocks : Map[LocalDate, Set[Block]], userActions : SchedulingUserActions)
     {
-        stage.getScene match // TODO - use it to just set data if scene not initialized (null?)
-        {
-            case null => println(s"initializeWithData - null")
-            
-            case scene => println(s"initializeWithData - Other - ${scene.getClass}")
-        }
         Platform.runLater
         {
             stage.scene = new TableScene(futureSurgeryInfo, blocks, stage, userActions)
@@ -77,12 +71,14 @@ object ScheduleMainWindow extends JFXApp3 with SchedulingMainWindowActions
         super.stopApp()
     }
     
-    override def showOptionsForFreeBlock(work : GetOptionsForFreeBlockWork)
+    override def showOptionsForFreeBlock(startTime : LocalTime,
+                                         endTime : LocalTime,
+                                         date : LocalDate,
+                                         topOptions : Seq[BlockFillingOption])
     {
+        System.gc()
         Platform.runLater
         {
-            val GetOptionsForFreeBlockWork(startTime, endTime, dayOfWeek, _, _, _, _, _, _, Some(topOptions)) = work
-            
             // Labels
             val descriptionLabel = new Label()
             {

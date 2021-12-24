@@ -11,24 +11,22 @@ import view.common.{CommonUserActions, MainWindowActions}
 import work._
 
 import java.io.File
+import scala.concurrent.ExecutionContext
 
 object StatisticsWindowManagerActor
 {
-    def props(m_controller : ActorRef, mainWindow : StatisticsMainWindowActions) : Props = Props(new StatisticsWindowManagerActor(m_controller, mainWindow))
+    def props(m_controller : ActorRef, mainWindow : StatisticsMainWindowActions)(implicit ec : ExecutionContext) : Props = Props(new StatisticsWindowManagerActor(m_controller, mainWindow))
 }
 
-class StatisticsWindowManagerActor(override val m_controller : ActorRef, mainWindow : StatisticsMainWindowActions) extends MyActor with StatisticsUserActions
+class StatisticsWindowManagerActor(override val m_controller : ActorRef, override val mainWindow : StatisticsMainWindowActions)(implicit override val ec : ExecutionContext) extends MyActor with StatisticsUserActions
 {
-    private var m_settingsActor : Option[ActorRef] = None
     m_controller ! GetDoctorsStatisticsWork()
     
     
     override def receive =
     {
         case WorkSuccess(GetDoctorsStatisticsWork(Some(doctorsBaseStatistics), Some(surgeryAvgInfoByDoctorMap), Some(surgeryAvgInfoList), Some(operationCodeAndNames)), _) => getDoctorsStatisticsWork(doctorsBaseStatistics, surgeryAvgInfoByDoctorMap, surgeryAvgInfoList, operationCodeAndNames)
-
-        case TellAboutSettingsActorWork(settingsActor) => m_settingsActor = Some(settingsActor)
-
+        
         
         
         case WorkSuccess(_ : FileWork, _) => mainWindow.askAndReloadData(this)

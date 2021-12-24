@@ -13,6 +13,7 @@ class ManagerMenu(loadPastSurgeriesListener : EventHandler[ActionEvent],
                   radioBasicInformationListener : EventHandler[ActionEvent],
                   radioImprovementInformationAverageListener : EventHandler[ActionEvent],
                   radioImprovementInformationByOperationListener : EventHandler[ActionEvent],
+                  changeSettingsListener : EventHandler[ActionEvent]
                  ) extends MenuBar
 {
     val fileMenu = new Menu("File")
@@ -23,7 +24,8 @@ class ManagerMenu(loadPastSurgeriesListener : EventHandler[ActionEvent],
                               menuItem("Doctors ID Mapping", loadDoctorsIDMappingListener),
                               menuItem("Surgery ID Mapping", loadSurgeryIDMappingListener))
     
-    fileMenu.items = List(loadDataMenu)
+    fileMenu.items = List(loadDataMenu,
+                          menuItem("Settings", changeSettingsListener))
     
     val modeMenu = new Menu("Mode")
     val menuToggleGroup = new ToggleGroup()

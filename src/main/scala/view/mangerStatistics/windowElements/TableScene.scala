@@ -12,6 +12,8 @@ import view.mangerStatistics.StatisticsUserActions
 import view.mangerStatistics.windowElements.ManagerMenu.Modes._
 
 import java.io.File
+import scala.concurrent.Await
+import scala.concurrent.duration.DurationInt
 
 
 //Custom selection
@@ -27,6 +29,7 @@ class TableScene(val doctorsBaseStatistics : Seq[DoctorStatistics],
                  userActions : StatisticsUserActions) extends Scene
 {
     val APP_NAME = "Doctors Statistics"
+    val m_settings = Await.result(userActions.getSettings, 5 seconds)
     
     val data = ObservableBuffer.empty[DoctorStatistics] ++= doctorsBaseStatistics
     val table = new TableView[DoctorStatistics](data)
@@ -58,7 +61,8 @@ class TableScene(val doctorsBaseStatistics : Seq[DoctorStatistics],
         
         radioBasicInformationListener = _ => setNormalState(),
         radioImprovementInformationAverageListener = _ => setImproveAvgState(),
-        radioImprovementInformationByOperationListener = _ => getOperationFromUserAndSetMappers()
+        radioImprovementInformationByOperationListener = _ => getOperationFromUserAndSetMappers(),
+        changeSettingsListener = _ => userActions.changeSetting(stage)
         )
     
     setNormalState()
@@ -71,7 +75,7 @@ class TableScene(val doctorsBaseStatistics : Seq[DoctorStatistics],
         stage.title = s"$APP_NAME - $BASIC"
         table.items = data
         Columns.setColumnsNames(ColumnsNormalNames)
-        Columns.setColumnsMappers(new TableSceneNormalMappers)
+        Columns.setColumnsMappers(new TableSceneNormalMappers, m_settings)
         table.refresh()
     }
    
@@ -80,7 +84,7 @@ class TableScene(val doctorsBaseStatistics : Seq[DoctorStatistics],
         stage.title = s"$APP_NAME - $IMPROVE_AVG"
         table.items = data
         Columns.setColumnsNames(ColumnsAvgNames)
-        Columns.setColumnsMappers(new TableSceneImprovementMappers(this))
+        Columns.setColumnsMappers(new TableSceneImprovementMappers(this), m_settings)
         table.refresh()
     }
    
@@ -110,7 +114,7 @@ class TableScene(val doctorsBaseStatistics : Seq[DoctorStatistics],
                 println("Your choice: " + choice)
                 val doctorsIds = surgeryAvgInfoByDoctorMap.values.flatten.filter(_.operationCode == choice.operationCode).map(_.doctorId).toSet
                 table.items = data.filter(doc => doctorsIds.contains(doc.id))
-                Columns.setColumnsMappers(new TableSceneImprovementMappersBySurgery(this, choice.operationCode))
+                Columns.setColumnsMappers(new TableSceneImprovementMappersBySurgery(this, choice.operationCode), m_settings)
                 setImproveByOpState(choice.toString)
             }
             

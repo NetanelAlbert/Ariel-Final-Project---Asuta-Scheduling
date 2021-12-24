@@ -10,5 +10,8 @@ trait SchedulingMainWindowActions extends MainWindowActions
 {
     def initializeWithData(futureSurgeryInfo : Iterable[FutureSurgeryInfo], blocks : Map[LocalDate, Set[Block]], userActions : SchedulingUserActions)
     
-    def showOptionsForFreeBlock(work : GetOptionsForFreeBlockWork)
+    def showOptionsForFreeBlock(startTime : LocalTime,
+                                endTime : LocalTime,
+                                date : LocalDate,
+                                topOptions : Seq[BlockFillingOption])
 }

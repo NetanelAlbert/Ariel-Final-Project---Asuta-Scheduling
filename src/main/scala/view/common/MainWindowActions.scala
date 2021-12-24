@@ -36,9 +36,10 @@ trait MainWindowActions
     
     def askAndReloadData(userAction : CommonUserActions)
     {
+        System.gc()
         Platform.runLater
         {
-            val message = "Data loaded succesfully.\nDo you want to reload?"
+            val message = "Data loaded successfully. \nDo you want to reload?"
 
             // Create and show confirmation alert
             val alert = new Alert(AlertType.Confirmation) {

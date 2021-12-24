@@ -1,30 +1,26 @@
 package view.schduling
 
 import akka.actor.{Actor, ActorRef, Props}
-import model.DTOs.{DoctorStatistics, OperationCodeAndName, Settings, SurgeryAvgInfo, SurgeryAvgInfoByDoctor}
 import model.actors.MyActor
 import org.joda.time.{LocalDate, LocalTime}
 import view.common.{CommonUserActions, MainWindowActions}
-import work.{FileWork, GetCurrentScheduleWork, GetDoctorsStatisticsWork, GetOptionsForFreeBlockWork, ReadDoctorsMappingExcelWork, ReadFutureSurgeriesExcelWork, ReadPastSurgeriesExcelWork, ReadProfitExcelWork, ReadSurgeryMappingExcelWork, TellAboutSettingsActorWork, WorkFailure, WorkSuccess}
+import work.{FileWork, GetCurrentScheduleWork, GetOptionsForFreeBlockWork, ReadFutureSurgeriesExcelWork, WorkFailure, WorkSuccess}
 
 import java.io.File
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 object SchedulingWindowManagerActor
 {
-    def props(m_controller : ActorRef, mainWindow : SchedulingMainWindowActions) : Props = Props(new SchedulingWindowManagerActor(m_controller, mainWindow))
+    def props(m_controller : ActorRef, mainWindow : SchedulingMainWindowActions)(implicit ec : ExecutionContext) : Props = Props(new SchedulingWindowManagerActor(m_controller, mainWindow))
 }
 
-class SchedulingWindowManagerActor(override val m_controller : ActorRef, mainWindow : SchedulingMainWindowActions) extends MyActor with SchedulingUserActions
+class SchedulingWindowManagerActor(override val m_controller : ActorRef, override val mainWindow : SchedulingMainWindowActions)(implicit override val ec : ExecutionContext) extends MyActor with SchedulingUserActions
 {
-    private var m_settingsActor : Option[ActorRef] = None
     reloadDefaultData
     
     override def receive =
     {
-        case TellAboutSettingsActorWork(settingsActor) => m_settingsActor = Some(settingsActor)
-
-        case WorkSuccess(work : GetOptionsForFreeBlockWork, _) => mainWindow.showOptionsForFreeBlock(work)
+        case WorkSuccess(work @ GetOptionsForFreeBlockWork(startTime, endTime, date, _, _, _, _, _, _, Some(topOptions)), _) => mainWindow.showOptionsForFreeBlock(startTime, endTime, date, topOptions)
 
         case WorkSuccess(GetCurrentScheduleWork(_, _, Some(schedule), Some(blocks)), _) => mainWindow.initializeWithData(schedule, blocks, this) //TODO maybe just change data on second time an on
 

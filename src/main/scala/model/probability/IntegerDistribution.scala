@@ -8,7 +8,8 @@ import scala.collection.mutable
 // todo find a way to make it generic and be able to multiply in expectation()
 case class IntegerDistribution(m_distribution: Map[Int, Double]) extends RandomVariable[Int]
 {
-    require(Math.abs(m_distribution.values.sum-1) < 0.0001, s"The sum of all probabilities has to be 1 but it is ${m_distribution.values.sum}")
+    import IntegerDistribution._
+    require(Math.abs(m_distribution.values.sum-1) < EPSILON, s"The sum of all probabilities has to be 1 but it is ${m_distribution.values.sum}")
     
     override def support : Set[Int] =
     {
@@ -17,7 +18,19 @@ case class IntegerDistribution(m_distribution: Map[Int, Double]) extends RandomV
     
     override def p(element : Int) : Double =
     {
-        m_distribution.getOrElse(element, 0)
+        val result = m_distribution.getOrElse(element, 0d)
+        if(result < 0 && (- EPSILON) < result)
+        {
+            0
+        }
+        else if(1 < result && result < 1 + EPSILON)
+        {
+            1
+        }
+        else
+        {
+            result
+        }
     }
     
     override def cumulativeP(element : Int) : Double=
@@ -39,7 +52,10 @@ case class IntegerDistribution(m_distribution: Map[Int, Double]) extends RandomV
     
     override def expectation : Double=
     {
-        m_distribution.map(x => x._1*x._2).sum
+        m_distribution.map
+        {
+            case (k, v) => k * v
+        }.sum
     }
     
     def getMin : Int = support.min
@@ -102,13 +118,13 @@ case class IntegerDistribution(m_distribution: Map[Int, Double]) extends RandomV
     
     /**
      * Create a new IntegerDistribution with adding a constant value to each of the distribution values without chang the probabilities.
-     * @param number - the value to add.
+     * @param valueToAdd - the value to add.
      */
-    def + (number : Int) : IntegerDistribution =
+    def + (valueToAdd : Int) : IntegerDistribution =
     {
         val newDistribution = m_distribution.map
         {
-            case (k, v) => (k + number) -> v
+            case (oldValue, p) => (oldValue + valueToAdd) -> p
         }
         IntegerDistribution(newDistribution)
     }
@@ -116,6 +132,8 @@ case class IntegerDistribution(m_distribution: Map[Int, Double]) extends RandomV
 
 object IntegerDistribution
 {
+    val EPSILON = 0.0001
+    
     def apply(data : Iterable[Int]) : IntegerDistribution =
     {
         val distribution = data.groupBy(identity).mapValues(_.size.toDouble/data.size)

@@ -4,13 +4,13 @@ import akka.event.LoggingAdapter
 
 trait Work
 
-case class WorkSuccess(work: Work, message : Option[String])(implicit m_logger : LoggingAdapter)
+case class WorkSuccess(work: Work, message : Option[String] = None)(implicit m_logger : LoggingAdapter)
 {
     m_logger.info(s"WorkSuccess(work.Class = ${work.getClass}, message = $message)")
     
 }
 
-case class WorkFailure(work: Work, cause : Option[Throwable], message : Option[String])(implicit m_logger : LoggingAdapter)
+case class WorkFailure(work: Work, cause : Option[Throwable], message : Option[String])(implicit m_logger : LoggingAdapter) extends Throwable(message.orNull, cause.orNull)
 {
     m_logger.error(s"WorkFailure(work.Class = ${work.getClass}, cause = $cause, message = $message)")
     cause.foreach(_.printStackTrace())

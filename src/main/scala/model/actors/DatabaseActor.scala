@@ -2,6 +2,8 @@ package model.actors
 
 import akka.Done
 import akka.actor.{ActorRef, Props}
+import akka.pattern.ask
+import akka.util.Timeout
 import model.DTOs._
 import model.database._
 import org.joda.time.LocalDate
@@ -16,7 +18,7 @@ object DatabaseActor
     def props(m_controller : ActorRef, m_modelManager : ActorRef)(implicit ec : ExecutionContext) : Props = Props(new DatabaseActor(m_controller, m_modelManager))
 }
 
-class DatabaseActor(m_controller : ActorRef, m_modelManager : ActorRef)(implicit ec : ExecutionContext) extends MyActor
+class DatabaseActor(m_controller : ActorRef, m_modelManager : ActorRef)(implicit override val ec : ExecutionContext) extends MyActor with SettingsAccess
 {
     val m_db = DBConnection.get()
     
@@ -151,6 +153,8 @@ class DatabaseActor(m_controller : ActorRef, m_modelManager : ActorRef)(implicit
     {
         val copyWork = for
         {
+            settings <- getSettings
+            
             // TODO remove plusDays
             availableDoctorsIDs <- doctorAvailabilityTable.getAvailableDoctorsIDs(date.plusDays(2).getDayOfWeek).flatMap
             {
@@ -170,10 +174,10 @@ class DatabaseActor(m_controller : ActorRef, m_modelManager : ActorRef)(implicit
             allSurgeriesID = doctorsWithSurgeries.values.flatten.map(_.operationCode).toSet
             surgeryStatistics <- surgeryStatisticsTable.getByIDsAndValidateSize(allSurgeriesID)
             surgeryAvgInfo <- surgeryAvgInfoTable.getByIDsAndValidateSize(allSurgeriesID)
-    
-            //todo date days from setting, and shrink the default duration
-            // (month is too much if we check every hour)
-            plannedSurgeries <- scheduleTable.selectByDates(date.minusDays(14), date.plusDays(14)).map(_.filter(! _.released))
+            
+            plannedSurgeries <- scheduleTable.selectByDates(date.minusDays(settings.surgeriesForBedCalculationDaysBefore),
+                                                            date.plusDays(settings.surgeriesForBedCalculationDaysAfter))
+                                             .map(_.filter(! _.released))
             plannedSurgeriesIDs = plannedSurgeries.map(_.operationCode).toSet
             plannedSurgeryStatistics <- surgeryStatisticsTable.getByIDsAndValidateSize(plannedSurgeriesIDs)
         } yield work.copy(doctorsWithSurgeries = Some(doctorsWithSurgeries),
@@ -193,7 +197,6 @@ class DatabaseActor(m_controller : ActorRef, m_modelManager : ActorRef)(implicit
                 m_controller ! WorkFailure(work, Some(exception), Some(info))
             }
         }
-        
     }
     
     def getDoctorsStatisticsWork(work : GetDoctorsStatisticsWork)

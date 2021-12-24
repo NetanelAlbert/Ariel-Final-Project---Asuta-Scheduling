@@ -20,19 +20,19 @@ object FileActor
               m_modelManager : ActorRef,
               m_databaseActor : ActorRef,
               m_AnalyzeDataActor : ActorRef,
-              m_settingActor : ActorRef)(implicit ec : ExecutionContext) : Props =
+              )(implicit ec : ExecutionContext) : Props =
         Props(new FileActor(m_controller,
                             m_modelManager,
                             m_databaseActor,
                             m_AnalyzeDataActor,
-                            m_settingActor))
+                            ))
 }
 
 class FileActor(m_controller : ActorRef,
                 m_modelManager : ActorRef,
                 m_databaseActor : ActorRef,
                 m_AnalyzeDataActor : ActorRef,
-                m_settingActor : ActorRef)(implicit ec : ExecutionContext) extends MyActor
+                )(implicit override val ec : ExecutionContext) extends MyActor with SettingsAccess
 {
     val formatter = new DataFormatter()
     

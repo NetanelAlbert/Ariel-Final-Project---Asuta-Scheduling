@@ -4,14 +4,15 @@ import akka.actor.{ActorRef, Props}
 import model.actors.MyActor
 import view.mangerStatistics.{StatisticsMainWindowActions, StatisticsWindowManagerActor}
 import view.schduling.{SchedulingMainWindowActions, SchedulingWindowManagerActor}
-import work.{GetDoctorsStatisticsWork, TellAboutSettingsActorWork, WorkFailure, WorkSuccess}
+
+import scala.concurrent.ExecutionContext
 
 object ViewManager
 {
-    def props(m_controller : ActorRef, mainWindow : MainWindowActions) : Props = Props(new ViewManager(m_controller, mainWindow))
+    def props(m_controller : ActorRef, mainWindow : MainWindowActions)(implicit ec : ExecutionContext) : Props = Props(new ViewManager(m_controller, mainWindow))
 }
 
-class ViewManager(m_controller : ActorRef, mainWindow : MainWindowActions) extends MyActor
+class ViewManager(m_controller : ActorRef, mainWindow : MainWindowActions)(implicit ec : ExecutionContext) extends MyActor
 {
     val m_windowManagerActor = mainWindow match
     {

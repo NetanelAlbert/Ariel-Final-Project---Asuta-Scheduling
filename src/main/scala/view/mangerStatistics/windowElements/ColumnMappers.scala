@@ -1,19 +1,35 @@
 package view.mangerStatistics.windowElements
 
-import model.DTOs.{DoctorStatistics, SurgeryAvgInfo, SurgeryAvgInfoByDoctor}
+import model.DTOs.{DoctorStatistics, Settings, SurgeryAvgInfo, SurgeryAvgInfoByDoctor}
 import scalafx.beans.property.ObjectProperty
 import scalafx.beans.value.ObservableValue
 import scalafx.scene.control.TableColumn.CellDataFeatures
 
 import java.text.DecimalFormat
 
+case class ComparableOptionWithFallbackToString[T](value : Option[T])(implicit ev : T => Ordered[T]) extends Ordered[ComparableOptionWithFallbackToString[T]]
+{
+    override def toString = value.map(_.toString).getOrElse("Unknown")
+    
+    def compare(that : ComparableOptionWithFallbackToString[T]) : Int =  (this.value, that.value) match
+    {
+        case (None, None) => 0
+
+        case (Some(_), None) => 1
+        
+        case (None, Some(_)) => - 1
+
+        case (Some(thisV), Some(thatV)) => thisV.compare(thatV)
+    }
+    
+}
 
 trait TableSceneBaseMappers
 {
     
     import TableSceneBaseMappers._
     
-    def profitAvgColMapper(sdf : CellDataFeatures[DoctorStatistics, Int]) : ObservableValue[Int, Int]
+    def profitAvgColMapper(sdf : CellDataFeatures[DoctorStatistics, ComparableOptionWithFallbackToString[Int]]) : ObservableValue[ComparableOptionWithFallbackToString[Int], ComparableOptionWithFallbackToString[Int]]
     
     def surgeryDurationAvgMinutesColMapper(sdf : CellDataFeatures[DoctorStatistics, Double]) : ObservableValue[Double, Double]
     
@@ -21,7 +37,7 @@ trait TableSceneBaseMappers
     
     def hospitalizationDurationAvgHoursColMapper(sdf : CellDataFeatures[DoctorStatistics, Double]) : ObservableValue[Double, Double]
     
-    def globalAvgColMapper(sdf : CellDataFeatures[DoctorStatistics, Double]) : ObservableValue[Double, Double]
+    def globalAvgColMapper(settings : Settings)(sdf : CellDataFeatures[DoctorStatistics, Double]) : ObservableValue[Double, Double]
     
     def double2digits(double : Double) : Double = df.format(double).toDouble
 }
@@ -33,15 +49,30 @@ object TableSceneBaseMappers
 
 class TableSceneNormalMappers extends TableSceneBaseMappers
 {
-    def profitAvgColMapper(sdf : CellDataFeatures[DoctorStatistics, Int]) : ObservableValue[Int, Int] = ObjectProperty(sdf.value.profit.getOrElse(Int.MinValue)) //TODO is it ok?
+    def profitAvgColMapper(sdf : CellDataFeatures[DoctorStatistics, ComparableOptionWithFallbackToString[Int]]) : ObservableValue[ComparableOptionWithFallbackToString[Int], ComparableOptionWithFallbackToString[Int]] =
+    {
+        ObjectProperty(ComparableOptionWithFallbackToString[Int](sdf.value.profit))
+    }
     
-    def surgeryDurationAvgMinutesColMapper(sdf : CellDataFeatures[DoctorStatistics, Double]) : ObservableValue[Double, Double] = ObjectProperty(double2digits(sdf.value.surgeryDurationAvgMinutes))
+    def surgeryDurationAvgMinutesColMapper(sdf : CellDataFeatures[DoctorStatistics, Double]) : ObservableValue[Double, Double] =
+    {
+        ObjectProperty(double2digits(sdf.value.surgeryDurationAvgMinutes))
+    }
     
-    def restingDurationAvgMinutesColMapper(sdf : CellDataFeatures[DoctorStatistics, Double]) : ObservableValue[Double, Double] = ObjectProperty(double2digits(sdf.value.restingDurationAvgMinutes))
+    def restingDurationAvgMinutesColMapper(sdf : CellDataFeatures[DoctorStatistics, Double]) : ObservableValue[Double, Double] =
+    {
+        ObjectProperty(double2digits(sdf.value.restingDurationAvgMinutes))
+    }
     
-    def hospitalizationDurationAvgHoursColMapper(sdf : CellDataFeatures[DoctorStatistics, Double]) : ObservableValue[Double, Double] = ObjectProperty(double2digits(sdf.value.hospitalizationDurationAvgHours))
+    def hospitalizationDurationAvgHoursColMapper(sdf : CellDataFeatures[DoctorStatistics, Double]) : ObservableValue[Double, Double] =
+    {
+        ObjectProperty(double2digits(sdf.value.hospitalizationDurationAvgHours))
+    }
     
-    def globalAvgColMapper(sdf : CellDataFeatures[DoctorStatistics, Double]) : ObservableValue[Double, Double] = ObjectProperty(double2digits(sdf.value.globalAvg))
+    def globalAvgColMapper(settings : Settings)(sdf : CellDataFeatures[DoctorStatistics, Double]) : ObservableValue[Double, Double] =
+    {
+        ObjectProperty(double2digits(sdf.value.globalAvg(settings)))
+    }
 }
 
 class TableSceneImprovementMappers(tableScene : TableScene) extends TableSceneNormalMappers
@@ -60,11 +91,20 @@ class TableSceneImprovementMappers(tableScene : TableScene) extends TableSceneNo
         SurgeryAvgInfo(0, totalSurgeries.toInt, surgeryDurationAvgMinutes, restingDurationAvgMinutes, hospitalizationDurationAvgHours)
     }
     
-    override def surgeryDurationAvgMinutesColMapper(sdf : CellDataFeatures[DoctorStatistics, Double]) : ObservableValue[Double, Double] = ObjectProperty(improvement(sdf.value, _.surgeryDurationAvgMinutes, _.surgeryDurationAvgMinutes))
+    override def surgeryDurationAvgMinutesColMapper(sdf : CellDataFeatures[DoctorStatistics, Double]) : ObservableValue[Double, Double] =
+    {
+        ObjectProperty(improvement(sdf.value, _.surgeryDurationAvgMinutes, _.surgeryDurationAvgMinutes))
+    }
     
-    override def restingDurationAvgMinutesColMapper(sdf : CellDataFeatures[DoctorStatistics, Double]) : ObservableValue[Double, Double] = ObjectProperty(improvement(sdf.value, _.restingDurationAvgMinutes, _.restingDurationAvgMinutes))
+    override def restingDurationAvgMinutesColMapper(sdf : CellDataFeatures[DoctorStatistics, Double]) : ObservableValue[Double, Double] =
+    {
+        ObjectProperty(improvement(sdf.value, _.restingDurationAvgMinutes, _.restingDurationAvgMinutes))
+    }
     
-    override def hospitalizationDurationAvgHoursColMapper(sdf : CellDataFeatures[DoctorStatistics, Double]) : ObservableValue[Double, Double] = ObjectProperty(improvement(sdf.value, _.hospitalizationDurationAvgHours, _.hospitalizationDurationAvgHours))
+    override def hospitalizationDurationAvgHoursColMapper(sdf : CellDataFeatures[DoctorStatistics, Double]) : ObservableValue[Double, Double] =
+    {
+        ObjectProperty(improvement(sdf.value, _.hospitalizationDurationAvgHours, _.hospitalizationDurationAvgHours))
+    }
     
     private def improvement(doctor : DoctorStatistics,
                             doctorField : DoctorStatistics => Double,
@@ -95,11 +135,20 @@ class TableSceneImprovementMappers(tableScene : TableScene) extends TableSceneNo
 
 class TableSceneImprovementMappersBySurgery(tableScene : TableScene, operationCode : Double) extends TableSceneNormalMappers
 {
-    override def surgeryDurationAvgMinutesColMapper(sdf : CellDataFeatures[DoctorStatistics, Double]) : ObservableValue[Double, Double] = ObjectProperty(improvement(sdf.value, _.surgeryDurationAvgMinutes, _.surgeryDurationAvgMinutes))
+    override def surgeryDurationAvgMinutesColMapper(sdf : CellDataFeatures[DoctorStatistics, Double]) : ObservableValue[Double, Double] =
+    {
+        ObjectProperty(improvement(sdf.value, _.surgeryDurationAvgMinutes, _.surgeryDurationAvgMinutes))
+    }
     
-    override def restingDurationAvgMinutesColMapper(sdf : CellDataFeatures[DoctorStatistics, Double]) : ObservableValue[Double, Double] = ObjectProperty(improvement(sdf.value, _.restingDurationAvgMinutes, _.restingDurationAvgMinutes))
+    override def restingDurationAvgMinutesColMapper(sdf : CellDataFeatures[DoctorStatistics, Double]) : ObservableValue[Double, Double] =
+    {
+        ObjectProperty(improvement(sdf.value, _.restingDurationAvgMinutes, _.restingDurationAvgMinutes))
+    }
     
-    override def hospitalizationDurationAvgHoursColMapper(sdf : CellDataFeatures[DoctorStatistics, Double]) : ObservableValue[Double, Double] = ObjectProperty(improvement(sdf.value, _.hospitalizationDurationAvgHours, _.hospitalizationDurationAvgHours))
+    override def hospitalizationDurationAvgHoursColMapper(sdf : CellDataFeatures[DoctorStatistics, Double]) : ObservableValue[Double, Double] =
+    {
+        ObjectProperty(improvement(sdf.value, _.hospitalizationDurationAvgHours, _.hospitalizationDurationAvgHours))
+    }
     
     private def improvement(doctor : DoctorStatistics,
                             doctorSurgeryField : SurgeryAvgInfoByDoctor => Double,

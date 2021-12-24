@@ -1,26 +1,26 @@
 package view.mangerStatistics.windowElements
 
-import model.DTOs.DoctorStatistics
+import model.DTOs.{DoctorStatistics, Settings, SettingsObject}
 import scalafx.beans.property.StringProperty
 import scalafx.scene.control.TableColumn
 
 object Columns
 {
     val nameCol = new TableColumn[DoctorStatistics, String]("Doctor Name")
-    val profitAvgCol = new TableColumn[DoctorStatistics, Int]("Profit")
+    val profitAvgCol = new TableColumn[DoctorStatistics, ComparableOptionWithFallbackToString[Int]]("Profit")
     val surgeryDurationAvgMinutesCol = new TableColumn[DoctorStatistics, Double]("Average Surgery Duration (minutes)")
     val restingDurationAvgMinutesCol = new TableColumn[DoctorStatistics, Double]("Average Resting Duration (minutes)")
     val hospitalizationDurationAvgHoursCol = new TableColumn[DoctorStatistics, Double]("Average Hospitalization Duration (hours)")
     val globalAvgCol = new TableColumn[DoctorStatistics, Double]("Global Average")
     
-    def setColumnsMappers(mapper : TableSceneBaseMappers)
+    def setColumnsMappers(mapper : TableSceneBaseMappers, settings : Settings)
     {
         nameCol.cellValueFactory = sdf => StringProperty(sdf.value.nameOrId)
         profitAvgCol.cellValueFactory = mapper.profitAvgColMapper
         surgeryDurationAvgMinutesCol.cellValueFactory = mapper.surgeryDurationAvgMinutesColMapper
         restingDurationAvgMinutesCol.cellValueFactory = mapper.restingDurationAvgMinutesColMapper
         hospitalizationDurationAvgHoursCol.cellValueFactory = mapper.hospitalizationDurationAvgHoursColMapper
-        globalAvgCol.cellValueFactory = mapper.globalAvgColMapper
+        globalAvgCol.cellValueFactory = mapper.globalAvgColMapper(settings)
     }
     
     def setColumnsNames(names : ColumnsNames)
@@ -40,7 +40,7 @@ object Columns
                                                                               hospitalizationDurationAvgHoursCol,
                                                                               globalAvgCol)
     
-    setColumnsMappers(new TableSceneNormalMappers)
+    setColumnsMappers(new TableSceneNormalMappers, SettingsObject.default)
     setColumnsNames(ColumnsNormalNames)
 }
 
