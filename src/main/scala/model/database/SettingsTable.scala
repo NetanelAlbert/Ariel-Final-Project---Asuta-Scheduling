@@ -13,14 +13,15 @@ import scala.concurrent.{Await, ExecutionContext, Future}
 
 class SettingsSchema(tag: Tag) extends Table[Settings](tag, "Settings")
 {
-//    def doctorRankingProfitWeight = column[Int]("doctorRankingProfitWeight")
-//    def doctorRankingSurgeryTimeWeight = column[Int]("doctorRankingSurgeryTimeWeight")
-//    def doctorRankingHospitalizationTimeWeight = column[Int]("doctorRankingHospitalizationTimeWeight")
-    
     def doctorRankingProfitWeight = column[Int]("doctorRankingProfitWeight")
     def doctorRankingSurgeryTimeWeight = column[Int]("doctorRankingSurgeryTimeWeight")
     def doctorRankingRestingTimeWeight = column[Int]("doctorRankingRestingTimeWeight")
     def doctorRankingHospitalizationTimeWeight = column[Int]("doctorRankingHospitalizationTimeWeight")
+    
+    def blockOptionsRestingShortWeight = column[Int]("blockOptionsRestingShortWeight")
+    def blockOptionsHospitalizeShortWeight = column[Int]("blockOptionsHospitalizeShortWeight")
+    def blockOptionsProfitWeight = column[Int]("blockOptionsProfitWeight")
+    
     def shortSurgeryPrepareTimeMinutes = column[Int]("shortSurgeryPrepareTimeMinutes")
     def longSurgeryPrepareTimeMinutes = column[Int]("longSurgeryPrepareTimeMinutes")
     def longSurgeryDefinitionMinutes = column[Int]("longSurgeryDefinitionMinutes")
@@ -33,11 +34,19 @@ class SettingsSchema(tag: Tag) extends Table[Settings](tag, "Settings")
     def SurgeriesForBedCalculationDaysBefore = column[Int]("SurgeriesForBedCalculationDaysBefore")
     def SurgeriesForBedCalculationDaysAfter = column[Int]("SurgeriesForBedCalculationDaysAfter")
     
+    def avgSurgeryProfit = column[Option[Int]]("avgSurgeryProfit")
+    def avgDoctorProfit = column[Option[Int]]("avgDoctorProfit")
+    
     def columns = (
         doctorRankingProfitWeight,
         doctorRankingSurgeryTimeWeight,
         doctorRankingRestingTimeWeight,
         doctorRankingHospitalizationTimeWeight,
+    
+        blockOptionsRestingShortWeight,
+        blockOptionsHospitalizeShortWeight,
+        blockOptionsProfitWeight,
+        
         shortSurgeryPrepareTimeMinutes,
         longSurgeryPrepareTimeMinutes,
         longSurgeryDefinitionMinutes,
@@ -48,7 +57,9 @@ class SettingsSchema(tag: Tag) extends Table[Settings](tag, "Settings")
         numberOfPointsToLookForShortage,
         doctorAvailabilityMonthsToGoBack,
         SurgeriesForBedCalculationDaysBefore,
-        SurgeriesForBedCalculationDaysAfter
+        SurgeriesForBedCalculationDaysAfter,
+        avgSurgeryProfit,
+        avgDoctorProfit,
         )
 
     override def * = columns.mapTo[Settings]

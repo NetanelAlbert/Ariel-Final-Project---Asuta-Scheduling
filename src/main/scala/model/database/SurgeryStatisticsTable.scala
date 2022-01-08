@@ -107,7 +107,7 @@ class SurgeryStatisticsTable(m_db : DatabaseDef)(implicit ec : ExecutionContext)
     def getOperationCodeAndNames() : Future[Seq[OperationCodeAndName]] =
     {
         val pairsSeqFuture = m_db.run(this.map(row => (row.operationCode, row.operationName)).result)
-        for{seq <- pairsSeqFuture} yield seq.map(OperationCodeAndName.applyPair)
+        pairsSeqFuture.map(_.map(OperationCodeAndName.tupled))
     }
     
     def getByIDsAndValidateSize(ids : Iterable[Double]) : Future[Seq[SurgeryStatistics]] =

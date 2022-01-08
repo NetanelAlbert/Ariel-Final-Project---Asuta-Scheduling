@@ -28,28 +28,42 @@ class TableScene(futureSurgeryInfo : Iterable[FutureSurgeryInfo],
     val APP_NAME = "Surgery Scheduling"
     stage.title = APP_NAME
     val m_sdf = Utils.javaDateFormat
-    val m_settings = Await.result(userActions.getSettings, 5 seconds)
+    private var m_settings = Await.result(userActions.getSettings, 5 seconds)
     
     //todo remove
 //    userActions.getSurgeriesSuggestions(LocalTime.now(), LocalTime.now(), LocalDate.now())
     
-    val m_table = new DailyTableView(futureSurgeryInfo, blocks, m_settings)
+    private var m_table = new DailyTableView(futureSurgeryInfo, blocks, m_settings)
 //    table.refresh() todo
     
     
-    // Set Menu Line
+    // Menu Line actions
     def loadPastSurgeriesAndCall = getPathFromUserAndCall(stage, "Select Past Surgeries File")(_)
     def loadProfitAndCall = getPathFromUserAndCall(stage, "Select Profit File")(_)
     def loadDoctorsIDMappingAndCall = getPathFromUserAndCall(stage, "Select Doctors ID Mapping File")(_)
     def loadSurgeryIDMappingAndCall = getPathFromUserAndCall(stage, "Select Surgery ID Mapping File")(_)
     def loadScheduleAndCall = getPathFromUserAndCall(stage, "Select Schedule File")(_)
+    def changeSetting
+    {
+        userActions.changeSettingAndThen(stage)
+        {
+            newSettings =>
+            {
+                m_settings = newSettings
+                val date = m_table.date
+                m_table = new DailyTableView(futureSurgeryInfo, blocks, m_settings)
+                m_table.date = date
+            }
+        }
+    }
     
     val menu = new SchedulingMenu(
         loadPastSurgeriesListener = _ => loadPastSurgeriesAndCall(askIfToKeepMappingAndLoadPastSurgeries(stage, userActions)),
         loadProfitListener = _ => loadProfitAndCall(userActions.loadProfitListener),
         loadSurgeryIDMappingListener = _ => loadSurgeryIDMappingAndCall(userActions.loadSurgeryIDMappingListener),
         loadDoctorsIDMappingListener = _ => loadDoctorsIDMappingAndCall(userActions.loadDoctorsIDMappingListener),
-        loadScheduleListener = _ => loadScheduleAndCall(UiUtils.askIfToKeepMappingAndLoadSchedule(stage, userActions))
+        loadScheduleListener = _ => loadScheduleAndCall(UiUtils.askIfToKeepMappingAndLoadSchedule(stage, userActions)),
+        changeSettingsListener = _ => changeSetting
         )
     
     val prevButton = new Button("<")
@@ -91,18 +105,23 @@ class TableScene(futureSurgeryInfo : Iterable[FutureSurgeryInfo],
     val suggestionsButton = new Button("Get Suggestions")
     {
         onAction = _ => showGetSuggestionsDialog
-        prefWidth = 500
+//        prefWidth = 500
         margin = Insets(0, 50, 0, 500)
         style =
             """-fx-font-weight: bold;
               |-fx-font-size: 15;""".stripMargin
     }
     
-    menu.prefWidth = 1000
     val dateHBox = new HBox(prevButton, todayPicker, nextButton)
+    {
+        prefWidth = 200
+    }
 //    dateHBox.setAlignment(Pos.Center)
     
     val hBox = new HBox(menu, dateHBox, suggestionsButton)
+    {
+            prefWidth = Screen.primary.bounds.width
+    }
     //    HBox.setHgrow(menu, Priority.Always)
     //    HBox.setHgrow(suggestionsButton, Priority.Never)
     
@@ -174,7 +193,10 @@ class TableScene(futureSurgeryInfo : Iterable[FutureSurgeryInfo],
         val result = dialog.showAndWait()
     
         result match {
-            case Some(Result(from, to)) => userActions.getSurgeriesSuggestions(from, to, m_table.date)
+            case Some(Result(from, to)) =>
+            {
+                userActions.getSurgeriesSuggestions(from, to, m_table.date)
+            }
             case _ => // Do nothing
         }
     }

@@ -7,6 +7,7 @@ import scalafx.stage.{FileChooser, Stage}
 import view.schduling.SchedulingUserActions
 
 import java.io.File
+import java.text.DecimalFormat
 
 object UiUtils
 {
@@ -20,6 +21,16 @@ object UiUtils
 //    }
     
     private var lastFolder = System.getProperty("user.home")
+    val df : DecimalFormat = new DecimalFormat("#.##")
+    
+    def double2digits(double : Double) : Double = df.format(double).toDouble
+    
+    implicit class Double2digitsMapper(double: Double)
+    {
+        def double2digits = UiUtils.double2digits(double)
+    }
+    
+    def doubleToPercent(value : Double) : Int = (value * 100).toInt
     
     def getPathFromUserAndCall(stage : Stage, title : String)(action : File => Unit)
     {

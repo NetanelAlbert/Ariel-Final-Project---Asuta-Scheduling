@@ -12,7 +12,7 @@ case class SurgeryAvgInfoByDoctor
 {
     private var weightCache : Option[Int] = None
     //TODO use also the global avg in case of not enough data
-    def weight(settings : Settings) : Int =
+    def durationIncludePrepareTime(settings : Settings) : Int =
     {
         weightCache match
         {

@@ -1,14 +1,22 @@
 package view.common
 
-import model.DTOs.Settings
+import javafx.beans.binding.Bindings
+import model.DTOs.{Settings, SettingsObject, SurgeryBasicInfo}
 import scalafx.Includes.jfxDialogPane2sfx
+import scalafx.collections.ObservableBuffer
 import scalafx.geometry.Insets
-import scalafx.scene.control.{ButtonType, Dialog, Label, TextField, TextFormatter}
+import scalafx.scene.control.Alert.AlertType
+import scalafx.scene.control.ButtonBar.ButtonData
+import scalafx.scene.control.TextFormatter.Change
+import scalafx.scene.control.{Alert, ButtonType, Dialog, Label, ListCell, ListView, TextField, TextFormatter, Tooltip}
+import scalafx.scene.image.{Image, ImageView}
 import scalafx.scene.layout.GridPane
 import scalafx.stage.Stage
-import scalafx.util.StringConverter
+import scalafx.util.{Duration, StringConverter}
 import view.common.SettingEditorDialog.SettingsGridPane
+import work.BlockFillingOption
 
+import scala.io.Source
 import scala.util.Try
 
 class SettingEditorDialog(stage : Stage, settings : Settings) extends Dialog[Settings]
@@ -19,7 +27,9 @@ class SettingEditorDialog(stage : Stage, settings : Settings) extends Dialog[Set
     
     val settingsGridPane = new SettingsGridPane(settings)
     dialogPane().setContent(settingsGridPane)
-    dialogPane().buttonTypes = Seq(ButtonType.Cancel, ButtonType.OK)
+    
+    val resetButtonType = new ButtonType("Reset", ButtonData.Other)
+    dialogPane().buttonTypes = Seq(ButtonType.OK, resetButtonType, ButtonType.Cancel)
     
     resultConverter =
     {
@@ -28,7 +38,24 @@ class SettingEditorDialog(stage : Stage, settings : Settings) extends Dialog[Set
             if (dialogButton == ButtonType.OK)
             {
                 settingsGridPane.getSettings
-            } else
+            }
+            else if (dialogButton == resetButtonType)
+            {
+                val alert = new Alert(AlertType.Confirmation) {
+                    initOwner(stage)
+                    title = "Reset Settings"
+                    headerText = "Are you sure you want to reset settings to default? \nThin can't be undone."
+                }
+    
+                val result = alert.showAndWait()
+    
+                result match {
+                    case Some(ButtonType.OK) => SettingsObject.default
+                    
+                    case _ => null
+                }
+            }
+            else
             {
                 null
             }
@@ -42,42 +69,84 @@ object SettingEditorDialog
     {
         hgap = 10
         vgap = 10
-//        prefWidth = 1000
         padding = Insets(20, 10, 10, 10)
-        
-        private var row = 0
-        def createRow(text : String, defaultValue : Int) : TextField =
-        {
-            val textField = new TextField()
-            
-            textField.textFormatter = new TextFormatter[Int](
-                StringConverter[Int](_.toInt, _.toString),
-                defaultValue,
-                floatFilter)
-            
-//            textField.text = defaultValue.toString
-            add(new Label(text), 0, row)
-            add(textField, 1, row)
-            row += 1
-            textField
-        }
     
-        val doctorRankingProfitWeightField = createRow("doctorRankingProfitWeight", settings.doctorRankingProfitWeight)
-        val doctorRankingSurgeryTimeWeightField = createRow("doctorRankingSurgeryTimeWeight", settings.doctorRankingSurgeryTimeWeight)
-        val doctorRankingRestingTimeWeightField = createRow("doctorRankingRestingTimeWeight", settings.doctorRankingRestingTimeWeight)
-        val doctorRankingHospitalizationTimeWeightField = createRow("doctorRankingHospitalizationTimeWeight", settings.doctorRankingHospitalizationTimeWeight)
-        val shortSurgeryPrepareTimeMinutesField = createRow("shortSurgeryPrepareTimeMinutes", settings.shortSurgeryPrepareTimeMinutes)
-        val longSurgeryPrepareTimeMinutesField = createRow("longSurgeryPrepareTimeMinutes", settings.longSurgeryPrepareTimeMinutes)
-        val longSurgeryDefinitionMinutesField = createRow("longSurgeryDefinitionMinutes", settings.longSurgeryDefinitionMinutes)
-        val totalNumberOfRestingBedsField = createRow("totalNumberOfRestingBeds", settings.totalNumberOfRestingBeds)
-        val totalNumberOfHospitalizeBedsField = createRow("totalNumberOfHospitalizeBeds", settings.totalNumberOfHospitalizeBeds)
-        val numberOfOperationRoomsField = createRow("numberOfOperationRooms", settings.numberOfOperationRooms)
-        val distributionMaxLengthField = createRow("distributionMaxLength", settings.distributionMaxLength)
-        val numberOfPointsToLookForShortageField = createRow("numberOfPointsToLookForShortage", settings.numberOfPointsToLookForShortage)
-        val doctorAvailabilityMonthsToGoBackField = createRow("doctorAvailabilityMonthsToGoBack", settings.doctorAvailabilityMonthsToGoBack)
-        val surgeriesForBedCalculationDaysBeforeField = createRow("surgeriesForBedCalculationDaysBefore", settings.surgeriesForBedCalculationDaysBefore)
-        val surgeriesForBedCalculationDaysAfterField = createRow("surgeriesForBedCalculationDaysAfter", settings.surgeriesForBedCalculationDaysAfter)
+        val doctorRankingGrid = new GridPaneWithRows("Doctor Ranking")
+        val doctorRankingProfitWeightField = doctorRankingGrid.createIntRow("Profit Weight", settings.doctorRankingProfitWeight)
+        val doctorRankingSurgeryTimeWeightField = doctorRankingGrid.createIntRow("Surgery Time Weight", settings.doctorRankingSurgeryTimeWeight)
+        val doctorRankingRestingTimeWeightField = doctorRankingGrid.createIntRow("Resting Time Weight", settings.doctorRankingRestingTimeWeight)
+        val doctorRankingHospitalizationTimeWeightField = doctorRankingGrid.createIntRow("Hospitalization Time Weight", settings.doctorRankingHospitalizationTimeWeight)
         
+        val blockOptionsGrid = new GridPaneWithRows("Block Filling Algorithm")
+        val blockOptionsRestingShortWeightField = blockOptionsGrid.createIntRow("Resting Short Weight", settings.blockOptionsRestingShortWeight)
+        val blockOptionsHospitalizeShortWeightField = blockOptionsGrid.createIntRow("Hospitalize Short Weight", settings.blockOptionsHospitalizeShortWeight)
+        val blockOptionsProfitWeightField = blockOptionsGrid.createIntRow("Profit Weight", settings.blockOptionsProfitWeight)
+        
+        val distributionMaxLengthField = blockOptionsGrid.createIntRow("Distribution Max Length", settings.distributionMaxLength)
+        val numberOfPointsToLookForShortageField = blockOptionsGrid.createIntRow("Number Of Points To Look For Shortage", settings.numberOfPointsToLookForShortage)
+        
+        val surgeriesForBedCalculationDaysBeforeField = blockOptionsGrid.createIntRow("Days Before - Bed Calculation", settings.surgeriesForBedCalculationDaysBefore)
+        val surgeriesForBedCalculationDaysAfterField = blockOptionsGrid.createIntRow("Days After - Bed Calculation", settings.surgeriesForBedCalculationDaysAfter)
+        
+        val prepareTimeGrid = new GridPaneWithRows("Surgery times")
+        val longSurgeryDefinitionMinutesField = prepareTimeGrid.createIntRow("Long Surgery Definition (minutes)", settings.longSurgeryDefinitionMinutes)
+        val shortSurgeryPrepareTimeMinutesField = prepareTimeGrid.createIntRow("Short Surgery Prepare Time (minutes)", settings.shortSurgeryPrepareTimeMinutes)
+        val longSurgeryPrepareTimeMinutesField = prepareTimeGrid.createIntRow("Long Surgery Prepare Time (minutes)", settings.longSurgeryPrepareTimeMinutes)
+    
+        val roomsAndBedsGrid = new GridPaneWithRows("Rooms & Beds")
+        val totalNumberOfRestingBedsField = roomsAndBedsGrid.createIntRow("Total Number Of Resting Beds", settings.totalNumberOfRestingBeds)
+        val totalNumberOfHospitalizeBedsField = roomsAndBedsGrid.createIntRow("Total Number Of Hospitalize Beds", settings.totalNumberOfHospitalizeBeds)
+        val numberOfOperationRoomsField = roomsAndBedsGrid.createIntRow("Number Of Operation Rooms", settings.numberOfOperationRooms)
+        
+        val doctorsAvailabilityGrid = new GridPaneWithRows("Doctors Availability")
+        val doctorAvailabilityMonthsToGoBackField = doctorsAvailabilityGrid.createIntRow("Months To Go Back", settings.doctorAvailabilityMonthsToGoBack, Some("Doctors availability is calculated based the days the worked in the last x months, as defined here."))
+        
+        val profitGrid = new GridPaneWithRows("Profit")
+        val avgSurgeryProfitField = profitGrid.createOptionalIntRow("Surgery Average Profit", settings.avgSurgeryProfit)
+        val avgDoctorProfitField = profitGrid.createOptionalIntRow("Doctor Average Profit", settings.avgDoctorProfit)
+        
+        def gridsList = List(
+            roomsAndBedsGrid,
+            blockOptionsGrid,
+            prepareTimeGrid,
+            doctorsAvailabilityGrid,
+            doctorRankingGrid,
+            profitGrid,
+            )
+        
+        private var currentPane : Option[GridPaneWithRows] = None
+        def setGrid(grid : GridPaneWithRows)
+        {
+            currentPane.foreach(children.remove(_))
+            currentPane = Some(grid)
+            add(grid, 1, 0)
+        }
+        
+        val sectionsListView = new ListView[GridPaneWithRows](gridsList)
+        {
+            selectionModel().selectedItemProperty.addListener(_ =>
+            {
+              val option = selectionModel().getSelectedItem
+              setGrid(option)
+            })
+    
+            cellFactory = _ =>
+            {
+                new ListCell[GridPaneWithRows]
+                {
+                    item.onChange{ (_, _, option) =>
+                    {
+                        if(Option(option).nonEmpty)
+                        {
+                            text = option.name
+                        }
+                    }}
+                }
+            }
+        }
+        
+        add(sectionsListView, 0, 0)
+        setGrid(roomsAndBedsGrid)
         
         def getSettings : Settings =
         {
@@ -86,6 +155,11 @@ object SettingEditorDialog
                 doctorRankingSurgeryTimeWeight = doctorRankingSurgeryTimeWeightField.text().toInt,
                 doctorRankingRestingTimeWeight = doctorRankingRestingTimeWeightField.text().toInt,
                 doctorRankingHospitalizationTimeWeight = doctorRankingHospitalizationTimeWeightField.text().toInt,
+
+                blockOptionsRestingShortWeight = blockOptionsRestingShortWeightField.text().toInt,
+                blockOptionsHospitalizeShortWeight = blockOptionsHospitalizeShortWeightField.text().toInt,
+                blockOptionsProfitWeight = blockOptionsProfitWeightField.text().toInt,
+                
                 shortSurgeryPrepareTimeMinutes = shortSurgeryPrepareTimeMinutesField.text().toInt,
                 longSurgeryPrepareTimeMinutes = longSurgeryPrepareTimeMinutesField.text().toInt,
                 longSurgeryDefinitionMinutes = longSurgeryDefinitionMinutesField.text().toInt,
@@ -97,29 +171,84 @@ object SettingEditorDialog
                 doctorAvailabilityMonthsToGoBack = doctorAvailabilityMonthsToGoBackField.text().toInt,
                 surgeriesForBedCalculationDaysBefore = surgeriesForBedCalculationDaysBeforeField.text().toInt,
                 surgeriesForBedCalculationDaysAfter = surgeriesForBedCalculationDaysAfterField.text().toInt,
+                avgSurgeryProfit = intOption(avgSurgeryProfitField.text()),
+                avgDoctorProfit = intOption(avgSurgeryProfitField.text()),
             )
         }
-        
-        def integerFilter = change => filter(change, _.toInt, "0")
+    }
     
-        def floatFilter = change => filter(change, _.toDouble, "0.0")
-        
-        def filter(change : TextFormatter.Change, actionToTry : String => Unit, defaultValue : String) : TextFormatter.Change =
+    def intOption(string : String) = Try(string.toInt).toOption
+    
+    def integerFilter = change => filter(change, _.toInt, "0")
+    
+    def integerOptionFilter = change => filter(change, {str => if(str.nonEmpty) str.toInt}, "")
+    
+    def floatFilter = change => filter(change, _.toDouble, "0")
+    
+    def filter(change : TextFormatter.Change, actionToTry : String => Unit, defaultValue : String) : TextFormatter.Change =
+    {
+        Try
         {
-            Try
+            actionToTry(change.controlNewText)
+        }.failed.foreach
+        {
+            _ => change.text = ""
+        }
+        
+        if(change.controlNewText.isEmpty)
+        {
+            change.text = defaultValue
+        }
+        
+        change
+    }
+    
+    class GridPaneWithRows(val name : String) extends GridPane
+    {
+        hgap = 10
+        vgap = 10
+        //        prefWidth = 1000
+        padding = Insets(20, 10, 10, 10)
+    
+        private var row = 0
+    
+        def createIntRow(text : String, defaultValue : Int, info : Option[String] = None) =
+        {
+            createRow[Int](text, defaultValue, _.toInt, _.toString, integerFilter, info)
+        }
+    
+        def createOptionalIntRow(text : String, defaultValue : Option[Int], info : Option[String] = None) =
+        {
+            createRow[Option[Int]](text, defaultValue, intOption, _.map(_.toString).getOrElse(""), integerOptionFilter, info)
+        }
+    
+        def createRow[T](text : String, defaultValue : T, toT : String => T, TToString : T => String, filter : Change => Change, info : Option[String] = None) : TextField =
+        {
+            val textField = new TextField()
             {
-                actionToTry(change.controlNewText)
-            }.failed.foreach
-            {
-                _ => change.text = ""
-            }
-            
-            if(change.controlNewText.isEmpty)
-            {
-                change.text = defaultValue
+                textFormatter = new TextFormatter[T](
+                    StringConverter[T](toT, TToString),
+                    defaultValue,
+                    filter)
             }
     
-            change
+            add(new Label(text), 0, row)
+            add(textField, 1, row)
+            info.foreach(info =>
+            {
+                val imageView = new ImageView(infoImage)
+                {
+                    pickOnBounds = true
+                    fitWidth = 20
+                    fitHeight = 20
+                    Tooltip.install(this, info)
+                }
+                add(imageView, 2, row)
+            })
+            row += 1
+            textField
         }
     }
+    
+    val infoImage = new Image("info-icon-50.png")
 }

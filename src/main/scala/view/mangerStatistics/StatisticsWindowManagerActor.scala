@@ -25,15 +25,29 @@ class StatisticsWindowManagerActor(override val m_controller : ActorRef, overrid
     
     override def receive =
     {
-        case WorkSuccess(GetDoctorsStatisticsWork(Some(doctorsBaseStatistics), Some(surgeryAvgInfoByDoctorMap), Some(surgeryAvgInfoList), Some(operationCodeAndNames)), _) => getDoctorsStatisticsWork(doctorsBaseStatistics, surgeryAvgInfoByDoctorMap, surgeryAvgInfoList, operationCodeAndNames)
+        case WorkSuccess(GetDoctorsStatisticsWork(Some(doctorsBaseStatistics), Some(surgeryAvgInfoByDoctorMap), Some(surgeryAvgInfoList), Some(operationCodeAndNames)), _) =>
+        {
+            mainWindow.hideProgressIndicator(true)
+            getDoctorsStatisticsWork(doctorsBaseStatistics, surgeryAvgInfoByDoctorMap, surgeryAvgInfoList, operationCodeAndNames)
+        }
         
-        
-        
-        case WorkSuccess(_ : FileWork, _) => mainWindow.askAndReloadData(this)
+        case WorkSuccess(_ : FileWork, _) =>
+        {
+            mainWindow.hideProgressIndicator(true)
+            mainWindow.askAndReloadData(this)
+        }
 
-        case WorkSuccess(work, message) => mainWindow.showSuccessDialog(message.getOrElse("Action succeed"))
+        case WorkSuccess(work, message) =>
+        {
+            mainWindow.hideProgressIndicator(true)
+            mainWindow.showSuccessDialog(message.getOrElse("Action succeed"))
+        }
 
-        case WorkFailure(work, cause, message) => mainWindow.showFailDialog(cause, message)
+        case WorkFailure(work, cause, message) =>
+        {
+            mainWindow.hideProgressIndicator(false)
+            mainWindow.showFailDialog(cause, message)
+        }
     }
     
     def getDoctorsStatisticsWork(doctorsBaseStatistics : Seq[DoctorStatistics], surgeryAvgInfoByDoctorMap : Map[Int, Seq[SurgeryAvgInfoByDoctor]], surgeryAvgInfoList : Seq[SurgeryAvgInfo], operationCodeAndNames : Seq[OperationCodeAndName])

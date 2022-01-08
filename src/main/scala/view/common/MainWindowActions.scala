@@ -1,12 +1,14 @@
 package view.common
 
 import scalafx.application.Platform
-import scalafx.scene.control.{Alert, ButtonType}
+import scalafx.scene.control.{Alert, ButtonType, Dialog, ProgressIndicator}
 import scalafx.scene.control.Alert.AlertType
 import scalafx.stage.Stage
 
 trait MainWindowActions
 {
+    def stage : Stage
+    
     def showSuccessDialog(message : String)
     {
         Platform.runLater
@@ -31,11 +33,10 @@ trait MainWindowActions
               |Cause: ${cause.map(_.getMessage).getOrElse("unknown")}""".stripMargin)
     }
     
-    def stage : Stage
-    
     
     def askAndReloadData(userAction : CommonUserActions)
     {
+        hideProgressIndicator(true)
         System.gc()
         Platform.runLater
         {
@@ -55,6 +56,30 @@ trait MainWindowActions
                 case Some(ButtonType.OK) => userAction.reloadDefaultData
                 case _ => // Do nothing
             }
+        }
+    }
+    
+    private var m_progressDialog : Option[ProgressDialog] = None
+    
+    def showProgressIndicator(progress : String)
+    {
+        Platform.runLater
+        {
+            val progressDialog = new ProgressDialog(stage, progress)
+            m_progressDialog = Some(progressDialog)
+            progressDialog.showAndWait()
+        }
+    }
+    
+    def hideProgressIndicator(status : Boolean)
+    {
+        Platform.runLater
+        {
+            m_progressDialog.foreach(progressDialog =>
+            {
+                progressDialog.finish(status)
+            })
+            m_progressDialog = None
         }
     }
 }

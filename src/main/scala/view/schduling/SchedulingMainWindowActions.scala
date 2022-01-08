@@ -13,5 +13,7 @@ trait SchedulingMainWindowActions extends MainWindowActions
     def showOptionsForFreeBlock(startTime : LocalTime,
                                 endTime : LocalTime,
                                 date : LocalDate,
-                                topOptions : Seq[BlockFillingOption])
+                                topOptions : Seq[BlockFillingOption],
+                                settings : Settings,
+                               )
 }

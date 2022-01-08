@@ -12,13 +12,27 @@ case class DoctorStatistics
 )
 {
     def nameOrId : String = name.getOrElse(s"$id (id)")
+    def nameWithId : String = name.map(name => s"$name - $id").getOrElse(s"$id (id)")
     
-    def globalAvg(settings : Settings) : Double =
+    def globalAvg(
+        settings : Settings,
+        surgeryDurationNormalizer : Double => Double,
+        restingDurationNormalizer : Double => Double,
+        hospitalizationDurationNormalizer : Double => Double,
+        profitNormalizer : Int => Double,
+    ) : Double =
     {
-        surgeryDurationAvgMinutes * settings.doctorRankingSurgeryTimeWeight +
-        restingDurationAvgMinutes * settings.doctorRankingRestingTimeWeight +
-        hospitalizationDurationAvgHours * settings.doctorRankingHospitalizationTimeWeight +
-        profit.getOrElse(0) * settings.doctorRankingProfitWeight
+        val sum = surgeryDurationNormalizer(surgeryDurationAvgMinutes) * settings.doctorRankingSurgeryTimeWeight +
+                  restingDurationNormalizer(restingDurationAvgMinutes) * settings.doctorRankingRestingTimeWeight +
+                  hospitalizationDurationNormalizer(hospitalizationDurationAvgHours) * settings.doctorRankingHospitalizationTimeWeight +
+                  profitNormalizer(profit.orElse(settings.avgSurgeryProfit).getOrElse(0)) * settings.doctorRankingProfitWeight
+        
+        val div = settings.doctorRankingSurgeryTimeWeight +
+                  settings.doctorRankingRestingTimeWeight +
+                  settings.doctorRankingHospitalizationTimeWeight +
+                  settings.doctorRankingProfitWeight
+        
+        sum / div
     }
 }
 

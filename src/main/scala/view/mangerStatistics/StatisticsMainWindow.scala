@@ -20,20 +20,21 @@ object StatisticsMainWindow extends JFXApp3 with StatisticsMainWindowActions
     override def start()
     {
         stage = new JFXApp3.PrimaryStage
-        stage.scene = new Scene
         {
-            content = new HBox
+            scene = new Scene
             {
-                padding = Insets(50, 80, 50, 80)
-                children = new Text
+                content = new HBox
                 {
-                    text = "Loading..."
-                    style = "-fx-font: normal bold 70pt sans-serif"
-                    fill = new LinearGradient(
-                        endX = 0,
-                        stops = Stops(Green, DarkGreen))
+                    padding = Insets(50, 80, 50, 80)
+                    children = new Text
+                    {
+                        text = "Loading..."
+                        style = "-fx-font: normal bold 70pt sans-serif"
+                        fill = new LinearGradient(
+                            endX = 0,
+                            stops = Stops(Green, DarkGreen))
+                    }
                 }
-                
             }
         }
     }

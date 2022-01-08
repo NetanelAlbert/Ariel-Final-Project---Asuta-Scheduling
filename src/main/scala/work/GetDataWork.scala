@@ -59,15 +59,5 @@ case class BlockFillingOption
         // NOTE - Reverse to sort from high score to low
         that.totalScore - this.totalScore
     }
-    
-    def explanation : String =
-        s"""Properties:
-          |
-          |Chance for resting beds short: \t$chanceForRestingShort
-          |Chance for hospitalize beds short: \t$chanceForHospitalizeShort
-          |Expected profit: \t${expectedProfit.getOrElse("Unknown")}
-          |""".stripMargin
-    
-    def description = "Surgeries: \n\n" + surgeries.map(_.nameOrCode).mkString("- ","\n- ", "")
 }
 

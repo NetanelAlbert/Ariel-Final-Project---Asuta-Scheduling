@@ -9,7 +9,7 @@ import scala.collection.mutable
 case class IntegerDistribution(m_distribution: Map[Int, Double]) extends RandomVariable[Int]
 {
     import IntegerDistribution._
-    require(Math.abs(m_distribution.values.sum-1) < EPSILON, s"The sum of all probabilities has to be 1 but it is ${m_distribution.values.sum}")
+    require(Math.abs(m_distribution.values.sum - 1) < EPSILON, s"The sum of all probabilities have to be 1 but it is ${m_distribution.values.sum}")
     
     override def support : Set[Int] =
     {

@@ -5,6 +5,8 @@ import slick.jdbc.HsqldbProfile.backend.DatabaseDef
 
 object DBConnection
 {
+    private var connectionCache : Option[DatabaseDef] = None
+    
     def get(test : Boolean = false) : DatabaseDef  =
     {
         connectionCache match
@@ -20,6 +22,4 @@ object DBConnection
             }
         }
     }
-    
-    private var connectionCache : Option[DatabaseDef] = None
 }

@@ -327,11 +327,15 @@ class FileActor(m_controller : ActorRef,
         val releasedIndex = 29
     }
     
-    //TODO :: handle fail? maybe validate file on UI?
-    def getSheet(file : File, index : Int = 0) : Sheet =
+    //TODO:: handle fail? maybe validate file on UI?
+    def getSheet(file : File, index : Int = 0) : Iterable[Row] =
     {
+        
+        //TODO:: use less memory (option - https://stackoverflow.com/a/28397328/11845387)
         val workbook = WorkbookFactory.create(file)
-        workbook.getSheetAt(index)
+        val sheet = workbook.getSheetAt(index)
+        workbook.close()
+        sheet
     }
     
     

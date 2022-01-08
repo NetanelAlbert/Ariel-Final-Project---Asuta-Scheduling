@@ -1,6 +1,8 @@
 package view.mangerStatistics.windowElements
 
 import model.DTOs.{DoctorStatistics, OperationCodeAndName, SurgeryAvgInfo, SurgeryAvgInfoByDoctor}
+import org.apache.poi.ss.formula.functions.Columns
+import scalafx.application.Platform
 import scalafx.collections.ObservableBuffer
 import scalafx.scene.Scene
 import scalafx.scene.control.Alert.AlertType
@@ -12,6 +14,7 @@ import view.mangerStatistics.StatisticsUserActions
 import view.mangerStatistics.windowElements.ManagerMenu.Modes._
 
 import java.io.File
+import java.util.concurrent.Callable
 import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
 
@@ -29,11 +32,13 @@ class TableScene(val doctorsBaseStatistics : Seq[DoctorStatistics],
                  userActions : StatisticsUserActions) extends Scene
 {
     val APP_NAME = "Doctors Statistics"
-    val m_settings = Await.result(userActions.getSettings, 5 seconds)
+    //TODO find other way
+    private var m_settings = Await.result(userActions.getSettings, 5 seconds)
     
     val data = ObservableBuffer.empty[DoctorStatistics] ++= doctorsBaseStatistics
     val table = new TableView[DoctorStatistics](data)
-    table.columns ++= Columns.columns
+    val columns = new Columns(doctorsBaseStatistics, surgeryAvgInfoByDoctorMap, surgeryAvgInfoList)
+    table.columns ++= columns.columns
     table.onMouseClicked = e =>
     {
         if (e.getClickCount == 2){
@@ -43,7 +48,7 @@ class TableScene(val doctorsBaseStatistics : Seq[DoctorStatistics],
     }
     
     // Dimensions settings
-    table.columns.foreach(_.setPrefWidth(Screen.primary.bounds.width / Columns.columns.size))
+//    table.columns.foreach(_.setPrefWidth(Screen.primary.bounds.width / columns.columns.size))
     table.prefHeight = Screen.primary.bounds.height
     
     table.columns.foreach(_.setStyle("-fx-alignment: center;"))
@@ -59,13 +64,37 @@ class TableScene(val doctorsBaseStatistics : Seq[DoctorStatistics],
         loadSurgeryIDMappingListener = _ => loadSurgeryIDMappingAndCall(userActions.loadSurgeryIDMappingListener),
         loadDoctorsIDMappingListener = _ => loadDoctorsIDMappingAndCall(userActions.loadDoctorsIDMappingListener),
         
-        radioBasicInformationListener = _ => setNormalState(),
-        radioImprovementInformationAverageListener = _ => setImproveAvgState(),
-        radioImprovementInformationByOperationListener = _ => getOperationFromUserAndSetMappers(),
-        changeSettingsListener = _ => userActions.changeSetting(stage)
+        radioBasicInformationListener = _ => setState(setNormalState()),
+        radioImprovementInformationAverageListener = _ => setState(setSimpleAvgState()),
+        radioImprovementInformationByOperationListener = _ => setState(getOperationFromUserAndSetMappers()),
+        changeSettingsListener = _ => changeSetting
         )
     
-    setNormalState()
+    def changeSetting
+    {
+        userActions.changeSettingAndThen(stage)
+        {
+            newSettings =>
+            {
+                m_settings = newSettings
+                refreshState()
+            }
+        }
+    }
+    
+    private var currentState : Callable[Unit] = () => setNormalState()
+    def setState(setter : => Unit)
+    {
+        currentState = () => setter
+        refreshState()
+    }
+    
+    def refreshState()
+    {
+        currentState.call()
+    }
+    
+    refreshState()
     val vBox = new VBox()
     vBox.children = List(menu, table)
     root = vBox
@@ -74,24 +103,21 @@ class TableScene(val doctorsBaseStatistics : Seq[DoctorStatistics],
     {
         stage.title = s"$APP_NAME - $BASIC"
         table.items = data
-        Columns.setColumnsNames(ColumnsNormalNames)
-        Columns.setColumnsMappers(new TableSceneNormalMappers, m_settings)
+        columns.setColumnsMappers(columns.m_avgByDoctorColumnsMappers, m_settings)
         table.refresh()
     }
    
-    def setImproveAvgState()
+    def setSimpleAvgState()
     {
         stage.title = s"$APP_NAME - $IMPROVE_AVG"
         table.items = data
-        Columns.setColumnsNames(ColumnsAvgNames)
-        Columns.setColumnsMappers(new TableSceneImprovementMappers(this), m_settings)
+        columns.setColumnsMappers(columns.m_simpleAvgColumnsMappers, m_settings)
         table.refresh()
     }
    
     def setImproveByOpState(opName : String)
     {
         stage.title = s"$APP_NAME - $IMPROVE_BY_OP ($opName)"
-        Columns.setColumnsNames(ColumnsAvgNames)
         table.refresh()
     }
     
@@ -113,8 +139,11 @@ class TableScene(val doctorsBaseStatistics : Seq[DoctorStatistics],
             {
                 println("Your choice: " + choice)
                 val doctorsIds = surgeryAvgInfoByDoctorMap.values.flatten.filter(_.operationCode == choice.operationCode).map(_.doctorId).toSet
-                table.items = data.filter(doc => doctorsIds.contains(doc.id))
-                Columns.setColumnsMappers(new TableSceneImprovementMappersBySurgery(this, choice.operationCode), m_settings)
+                val relevantData = data.filter(doc => doctorsIds.contains(doc.id))
+                table.items = relevantData
+                val personalAvgDiffColumnMapper = columns.generatePersonalAvgDiffColumnMapperByOperationCode(choice.operationCode)
+                val tableSceneNormalMappers = new TableSceneNormalMappers(relevantData.map(personalAvgDiffColumnMapper.diffMapper), personalAvgDiffColumnMapper)
+                columns.setColumnsMappers(tableSceneNormalMappers, m_settings)
                 setImproveByOpState(choice.toString)
             }
             
@@ -127,5 +156,14 @@ class TableScene(val doctorsBaseStatistics : Seq[DoctorStatistics],
     {
         println(doctorStatistics)
         //todo show details Dialog
+        Platform.runLater
+        {
+            val doctorInformationDialog = new DoctorInformationDialog(doctorStatistics,
+                                                                      surgeryAvgInfoByDoctorMap(doctorStatistics.id),
+                                                                      surgeryAvgInfoList,
+                                                                      operationCodeAndNames,
+                                                                      stage)
+            doctorInformationDialog.showAndWait()
+        }
     }
 }

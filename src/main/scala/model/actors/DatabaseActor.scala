@@ -97,10 +97,15 @@ class DatabaseActor(m_controller : ActorRef, m_modelManager : ActorRef)(implicit
     {
         val surgeriesFuture = surgeryStatisticsTable.setSurgeriesProfit(surgeriesProfit)
         val doctorsFuture = doctorStatisticsTable.setDoctorsProfit(doctorsProfit)
+        
+        val avgSurgeryProfit = surgeriesProfit.map(_._2).sum / surgeriesProfit.size
+        val avgDoctorProfit = doctorsProfit.map(_._2).sum / doctorsProfit.size
         val updates = for
         {
             _ <- surgeriesFuture
             _ <- doctorsFuture
+            currentSetting <- getSettings
+            _ <- setSettings(currentSetting.copy(avgSurgeryProfit = Some(avgSurgeryProfit), avgDoctorProfit = Some(avgDoctorProfit)))
         } yield Done.done()
         
         updates.onComplete
@@ -155,8 +160,7 @@ class DatabaseActor(m_controller : ActorRef, m_modelManager : ActorRef)(implicit
         {
             settings <- getSettings
             
-            // TODO remove plusDays
-            availableDoctorsIDs <- doctorAvailabilityTable.getAvailableDoctorsIDs(date.plusDays(2).getDayOfWeek).flatMap
+            availableDoctorsIDs <- doctorAvailabilityTable.getAvailableDoctorsIDs(date.getDayOfWeek).flatMap
             {
                 case result if result.isEmpty =>
                 {

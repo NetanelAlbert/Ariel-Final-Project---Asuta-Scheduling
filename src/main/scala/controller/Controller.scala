@@ -23,12 +23,17 @@ class Controller(mainWindow : MainWindowActions) extends MyActor
     override def receive : Receive =
     {
         case message if sender.path.toString.contains("modelManager") =>
+        {
             m_logger.debug(s"Received message : $message from Model Manager")
             m_viewManager ! message
+        }
+        
         case message if sender.path.toString.contains("viewManager") =>
+        {
             m_logger.debug(s"Received message : $message from View Manager")
             m_modelManager ! message
-
+        }
+        
         case message => m_logger.error(s"Received message : $message from unknown sender: ${sender.path}")
     }
     

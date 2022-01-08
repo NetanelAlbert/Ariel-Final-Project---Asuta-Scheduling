@@ -4,7 +4,7 @@ package model.actors
 import akka.actor.{ActorRef, Props}
 import model.DTOs._
 import model.probability.IntegerDistribution
-import org.joda.time.{Duration, LocalDate, LocalDateTime, LocalTime}
+import org.joda.time.{DateTime, Duration, LocalDate, LocalDateTime, LocalTime}
 import work.{BlockFillingOption, GetOptionsForFreeBlockWork, ReadPastSurgeriesExcelWork, WorkFailure, WorkSuccess}
 
 import scala.concurrent.duration.{DurationInt, DurationLong, FiniteDuration}
@@ -43,107 +43,23 @@ class AnalyzeDataActor(m_controller : ActorRef,
         val settings = Await.result(getSettings, 5 second)
         val startFunctionTime = new LocalTime()
         m_logger.info("Starting AnalyzeDataActor.getOptionsForFreeBlockWork")
-        val totalNumberOfRestingBeds = settings.totalNumberOfRestingBeds
-        val totalNumberOfHospitalizeBeds = settings.totalNumberOfHospitalizeBeds
-        val distributionMaxLength = settings.distributionMaxLength
-        val numberOfJumps = settings.numberOfPointsToLookForShortage
     
-        def plannedSurgeriesDistributions(maxValue : Int, numberOfSteps : Int, distribution : SurgeryStatistics => IntegerDistribution, unit : FiniteDuration => Long) : Map[Int, IntegerDistribution] =
-        {
-            val startDateTime = date.toDateTime(startTime)
-            val distributions = plannedSurgeries.map(surgery =>
-            {
-                val diffMillis = new Duration(startDateTime, surgery.plannedStart.toDateTime).getMillis.millis
-                val diff = unit(diffMillis).toInt
-                val timelessDistribution = plannedSurgeryStatistics.find(_.operationCode == surgery.operationCode).map(distribution).get
-                timelessDistribution + diff
-            })
-            val step = maxValue / numberOfSteps
-            (1 to maxValue by step).par.map(i =>
-            {
-                val indicatorsStillInBed = distributions.map(_.indicatorLessThenEq(i).opposite)
-                i -> IntegerDistribution.sumAndTrim(indicatorsStillInBed, distributionMaxLength)
-            }).toList.toMap
-        }
-        
-        val plannedSurgeriesRestingBedsDistributions = if(plannedSurgeries.nonEmpty)
-        {
-            val maxAvgResting = surgeryAvgInfo.map(_.restingDurationAvgMinutes).max.toInt + numberOfJumps
-            plannedSurgeriesDistributions(maxAvgResting, numberOfJumps, _.restingDistribution, _.toMinutes)
-        }
-        else
-        {
-            m_logger.warning(s"Got an empty plannedSurgeries list for getOptionsForFreeBlockWork $work")
-            Map(1 -> IntegerDistribution.empty())
-        }
-        
-        val plannedSurgeriesHospitalizeBedsDistributions = if(plannedSurgeries.nonEmpty)
-        {
-            val maxAvgHospitalize = surgeryAvgInfo.map(_.hospitalizationDurationAvgHours).max.toInt + numberOfJumps
-            plannedSurgeriesDistributions(maxAvgHospitalize, numberOfJumps, _.hospitalizationDistribution, _.toHours)
-        }
-        else
-        {
-            Map(1 -> IntegerDistribution.empty())
-        }
+        val startDateTime = date.toDateTime(startTime)
+        // The distributions of the number of used resting/hospitalize beds,
+        //  in some points from the start of this block
+        val plannedSurgeriesRestingBedsDistributions = plannedSurgeriesRestingDistributions(settings, startDateTime, plannedSurgeries, plannedSurgeryStatistics)
+        val plannedSurgeriesHospitalizeBedsDistributions = plannedSurgeriesHospitalizeDistributions(settings, startDateTime, plannedSurgeries, plannedSurgeryStatistics)
         
         val windowSizeMinutes = (endTime.getMillisOfDay - startTime.getMillisOfDay).millis.toMinutes.toInt
-        val doctorsSacks = doctorsWithSurgeries.values.par.map(knapsack(_, windowSizeMinutes, settings))
-    
-        val operationToSurgeryBasicInfoMapping = surgeryStatistics.map(surgery => surgery.operationCode -> surgery.basicInfo).toMap
-        val operationToProfitMapping = surgeryStatistics.map(surgery => surgery.operationCode -> surgery.profit).toMap
-        val operationToRestingDistributionMapping = surgeryStatistics.map(surgery => surgery.operationCode -> surgery.restingDistribution).toMap
-        val operationToHospitalizationDistributionMapping = surgeryStatistics.map(surgery => surgery.operationCode -> surgery.hospitalizationDistribution).toMap
-        
+        // The collections of suggested surgeries, per available doctor
+        val doctorsSacks = doctorsWithSurgeries.values.par.map(getDoctorSurgeriesSuggestions(windowSizeMinutes, settings))
         
         if(doctorsSacks.exists(_.nonEmpty))
         {
+            // The collections above, with scores for each one (e.g. the chance of resting beds shortage)
             val options = doctorsSacks.filter(_.nonEmpty).par.map
             {
-                surgeryAvgInfoByDoctorSeq =>
-                {
-                    val newSurgeriesRestingDistributions = surgeryAvgInfoByDoctorSeq.map(surgery => operationToRestingDistributionMapping(surgery.operationCode))
-//                    val newSurgeriesAvgRestingMinutes = surgeryAvgInfoByDoctorSeq.map(_.restingDurationAvgMinutes).sum.toInt
-                    val totalRestingBedsDistribution = plannedSurgeriesRestingBedsDistributions.map
-                    {
-                        case (i, distribution) =>
-                        {
-                            val newSurgeriesRestingBedsDistribution = IntegerDistribution.sumAndTrim(newSurgeriesRestingDistributions.map(_.+(i).indicatorLessThenEq(i).opposite), distributionMaxLength)
-                            IntegerDistribution.sumAndTrim(distributionMaxLength)(distribution, newSurgeriesRestingBedsDistribution)
-                        }
-                    }
-                    val chanceForRestingShort = totalRestingBedsDistribution.map(_.indicatorLessThenEq(totalNumberOfRestingBeds).no).max
-    
-                    val newSurgeriesHospitalizationDistributions = surgeryAvgInfoByDoctorSeq.map(surgery => operationToHospitalizationDistributionMapping(surgery.operationCode))
-//                    val newSurgeriesAvgHospitalizeHours = surgeryAvgInfoByDoctorSeq.map(_.hospitalizationDurationAvgHours).sum.toInt
-                    val totalHospitalizeBedsDistribution = plannedSurgeriesHospitalizeBedsDistributions.map
-                    {
-                        case (i, distribution) =>
-                        {
-                            val newSurgeriesHospitalizeBedsDistribution = IntegerDistribution.sumAndTrim(newSurgeriesHospitalizationDistributions.map(_.+(i).indicatorLessThenEq(i).opposite), distributionMaxLength)
-                            IntegerDistribution.sumAndTrim(distributionMaxLength)(distribution, newSurgeriesHospitalizeBedsDistribution)
-                        }
-                    }
-                    val chanceForHospitalizeShort = totalHospitalizeBedsDistribution.map(_.indicatorLessThenEq(totalNumberOfHospitalizeBeds).no).max
-    
-                    val expectedProfitTry = Try
-                    {
-                        surgeryAvgInfoByDoctorSeq.map(surgery => operationToProfitMapping(surgery.operationCode).get).sum
-                    }
-    
-                    val firstSurgery = surgeryAvgInfoByDoctorSeq.head
-                    BlockFillingOption(
-                        doctorId = firstSurgery.doctorId,
-                        doctorName = doctorMapping.get(firstSurgery.doctorId),
-                        surgeries = surgeryAvgInfoByDoctorSeq.map(surgery =>
-                        {
-                            operationToSurgeryBasicInfoMapping(surgery.operationCode)
-                        }),
-                        chanceForRestingShort = round(chanceForRestingShort, 2),
-                        chanceForHospitalizeShort = round(chanceForHospitalizeShort, 2),
-                        expectedProfit = expectedProfitTry.toOption
-                        )
-                }
+                getBlockFillingOptionMapper(settings, surgeryStatistics, doctorMapping, plannedSurgeriesRestingBedsDistributions, plannedSurgeriesHospitalizeBedsDistributions)
             }.toList
     
             m_controller ! WorkSuccess(work.copy(topOptions = Some(options)), Some(s"Found the top options for $startTime - $endTime"))
@@ -159,7 +75,71 @@ class AnalyzeDataActor(m_controller : ActorRef,
         m_logger.info(s"Duration: $duration")
     }
     
-    def knapsack(surgeries : Seq[SurgeryAvgInfoByDoctor], W : Int, settings: Settings) : Seq[SurgeryAvgInfoByDoctor] =
+    def plannedSurgeriesRestingDistributions(settings : Settings, startDateTime : DateTime, plannedSurgeries : Seq[FutureSurgeryInfo], plannedSurgeryStatistics : Seq[SurgeryStatistics]) : Map[Int, IntegerDistribution] =
+    {
+        plannedSurgeriesDistributions(_.restingDistribution, _.toMinutes)(settings, startDateTime, plannedSurgeries, plannedSurgeryStatistics)
+    }
+    
+    def plannedSurgeriesHospitalizeDistributions(settings : Settings, startDateTime : DateTime, plannedSurgeries : Seq[FutureSurgeryInfo], plannedSurgeryStatistics : Seq[SurgeryStatistics]) : Map[Int, IntegerDistribution] =
+    {
+        plannedSurgeriesDistributions(_.hospitalizationDistribution, _.toHours)(settings, startDateTime, plannedSurgeries, plannedSurgeryStatistics)
+    }
+    
+    def plannedSurgeriesDistributions(distribution : SurgeryStatistics => IntegerDistribution, timeUnit : FiniteDuration => Long)
+                                     (settings : Settings, startDateTime : DateTime, plannedSurgeries : Seq[FutureSurgeryInfo], plannedSurgeryStatistics : Seq[SurgeryStatistics]) : Map[Int, IntegerDistribution] =
+    {
+        if(plannedSurgeries.nonEmpty)
+        {
+            val numberOfSteps = settings.numberOfPointsToLookForShortage
+            val distributionMaxLength = settings.distributionMaxLength
+            val maxValue = plannedSurgeryStatistics.map(distribution(_).expectation).max.toInt + numberOfSteps
+        
+            // The distribution for each surgery x, that the patient is still resting / hospitalizing
+            val distributions = plannedSurgeries.map(surgery =>
+            {
+                 val surgeryStartTime = surgery.plannedStart.toDateTime
+                 val diffDuration = new Duration(startDateTime, surgeryStartTime).getMillis.millis
+                 val diff = timeUnit(diffDuration).toInt // Hours / Minutes
+                 val timelessDistribution = plannedSurgeryStatistics.find(_.operationCode == surgery.operationCode).map(distribution).get
+                 timelessDistribution + diff
+            })
+        
+            val step = maxValue / numberOfSteps
+            (1 to maxValue by step).par.map(i =>
+            {
+                val indicatorsStillInBed = distributions.map(_.indicatorLessThenEq(i).opposite)
+                i -> IntegerDistribution.sumAndTrim(indicatorsStillInBed, distributionMaxLength)
+            }).toList.toMap
+        }
+        else
+        {
+            m_logger.warning(s"Got an empty plannedSurgeries list for getOptionsForFreeBlockWork")
+            Map(1 -> IntegerDistribution.empty())
+        }
+    }
+    
+    def getDoctorSurgeriesSuggestions(windowSizeMinutes : Int, settings : Settings)(surgeries : Seq[SurgeryAvgInfoByDoctor]) : Seq[SurgeryAvgInfoByDoctor] =
+    {
+        val allSurgeriesLength = surgeries.map(surg => surg.amountOfData * surg.surgeryDurationAvgMinutes).sum
+        val proportionalAmountEachSurgery = surgeries.flatMap
+        {
+            surg =>
+            {
+                val surgeryLengthMulTimes = surg.amountOfData * surg.surgeryDurationAvgMinutes
+                val proportion = surgeryLengthMulTimes / allSurgeriesLength
+                val minutesForThisSurg = proportion * windowSizeMinutes
+                val repeats = (minutesForThisSurg / surg.durationIncludePrepareTime(settings)).toInt
+                Seq.fill(repeats)(surg)
+            }
+        }
+        
+        val leftTime = windowSizeMinutes - proportionalAmountEachSurgery.map(_.durationIncludePrepareTime(settings)).sum
+        val surgeriesForLeftTime = knapsack(surgeries, leftTime, settings)
+        
+        proportionalAmountEachSurgery ++ surgeriesForLeftTime
+    }
+    
+    def knapsack(surgeries : Seq[SurgeryAvgInfoByDoctor], W : Int, settings : Settings) : Seq[SurgeryAvgInfoByDoctor] =
     {
         if(surgeries.isEmpty) return Nil
         
@@ -168,17 +148,71 @@ class AnalyzeDataActor(m_controller : ActorRef,
         
         for(w <- 1 to W)
         {
-            val smallEnoughSurgeries = surgeries.filter(_.weight(settings) <= w)
+            val smallEnoughSurgeries = surgeries.filter(_.durationIncludePrepareTime(settings) <= w)
             if(smallEnoughSurgeries.nonEmpty)
             {
-                val options = smallEnoughSurgeries.map(surg => surg.value + m(w - surg.weight(settings)) -> surg).toMap
+                val options = smallEnoughSurgeries.map(surg => surg.value + m(w - surg.durationIncludePrepareTime(settings)) -> surg).toMap
                 val best = options(options.keys.max)
-                m(w) = best.value + m(w - best.weight(settings))
-                sacks(w) = sacks(w - best.weight(settings)) :+ best
+                m(w) = best.value + m(w - best.durationIncludePrepareTime(settings))
+                sacks(w) = sacks(w - best.durationIncludePrepareTime(settings)) :+ best
             }
         }
         
         sacks(W)
+    }
+    
+    def getBlockFillingOptionMapper(settings : Settings, surgeryStatistics : Seq[SurgeryStatistics], doctorMapping : Map[Int, String], plannedSurgeriesRestingBedsDistributions : Map[Int, IntegerDistribution], plannedSurgeriesHospitalizeBedsDistributions : Map[Int, IntegerDistribution]) : Seq[SurgeryAvgInfoByDoctor] => BlockFillingOption =
+    {
+        val operationToSurgeryBasicInfoMapping = surgeryStatistics.map(surgery => surgery.operationCode -> surgery.basicInfo).toMap
+        val operationToProfitMapping = surgeryStatistics.map(surgery => surgery.operationCode -> surgery.profit).toMap
+        val operationToRestingDistributionMapping = surgeryStatistics.map(surgery => surgery.operationCode -> surgery.restingDistribution).toMap
+        val operationToHospitalizationDistributionMapping = surgeryStatistics.map(surgery => surgery.operationCode -> surgery.hospitalizationDistribution).toMap
+        
+        val distributionMaxLength = settings.distributionMaxLength
+        val totalNumberOfRestingBeds = settings.totalNumberOfRestingBeds
+        val totalNumberOfHospitalizeBeds = settings.totalNumberOfHospitalizeBeds
+    
+        def getBlockFillingOption(surgeryAvgInfoByDoctorSeq : Seq[SurgeryAvgInfoByDoctor]) : BlockFillingOption =
+        {
+            val newSurgeriesRestingDistributions = surgeryAvgInfoByDoctorSeq.map(surgery => operationToRestingDistributionMapping(surgery.operationCode))
+            val totalRestingBedsDistribution = plannedSurgeriesRestingBedsDistributions.map
+            {
+                case (i, distribution) =>
+                {
+                    val newSurgeriesRestingBedsDistribution = IntegerDistribution.sumAndTrim(newSurgeriesRestingDistributions.map(_.indicatorLessThenEq(i).opposite), distributionMaxLength)
+                    IntegerDistribution.sumAndTrim(distributionMaxLength)(distribution, newSurgeriesRestingBedsDistribution)
+                }
+            }
+            val chanceForRestingShort = totalRestingBedsDistribution.map(_.indicatorLessThenEq(totalNumberOfRestingBeds).no).max
+    
+            val newSurgeriesHospitalizationDistributions = surgeryAvgInfoByDoctorSeq.map(surgery => operationToHospitalizationDistributionMapping(surgery.operationCode))
+            val totalHospitalizeBedsDistribution = plannedSurgeriesHospitalizeBedsDistributions.map
+            {
+                case (i, distribution) =>
+                {   // NOTE -->                                                                                                        // was _.+(i).indicator...
+                    val newSurgeriesHospitalizeBedsDistribution = IntegerDistribution.sumAndTrim(newSurgeriesHospitalizationDistributions.map(_.indicatorLessThenEq(i).opposite), distributionMaxLength)
+                    IntegerDistribution.sumAndTrim(distributionMaxLength)(distribution, newSurgeriesHospitalizeBedsDistribution)
+                }
+            }
+            val chanceForHospitalizeShort = totalHospitalizeBedsDistribution.map(_.indicatorLessThenEq(totalNumberOfHospitalizeBeds).no).max
+    
+            val expectedProfitTry = Try
+            {
+                surgeryAvgInfoByDoctorSeq.map(surgery => operationToProfitMapping(surgery.operationCode).orElse(settings.avgSurgeryProfit).get).sum
+            }
+    
+            val firstSurgery = surgeryAvgInfoByDoctorSeq.head
+            BlockFillingOption(
+                doctorId = firstSurgery.doctorId,
+                doctorName = doctorMapping.get(firstSurgery.doctorId),
+                surgeries = surgeryAvgInfoByDoctorSeq.map(_.operationCode).map(operationToSurgeryBasicInfoMapping(_)),
+                chanceForRestingShort = round(chanceForRestingShort, 2),
+                chanceForHospitalizeShort = round(chanceForHospitalizeShort, 2),
+                expectedProfit = expectedProfitTry.toOption
+                )
+        }
+    
+        getBlockFillingOption
     }
     
     

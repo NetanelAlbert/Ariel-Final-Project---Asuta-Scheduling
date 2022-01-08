@@ -4,10 +4,11 @@ import akka.actor.{Actor, ActorRef, Props}
 import model.actors.MyActor
 import org.joda.time.{LocalDate, LocalTime}
 import view.common.{CommonUserActions, MainWindowActions}
-import work.{FileWork, GetCurrentScheduleWork, GetOptionsForFreeBlockWork, ReadFutureSurgeriesExcelWork, WorkFailure, WorkSuccess}
+import work.{BlockFillingOption, FileWork, GetCurrentScheduleWork, GetOptionsForFreeBlockWork, ReadFutureSurgeriesExcelWork, WorkFailure, WorkSuccess}
 
 import java.io.File
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success}
 
 object SchedulingWindowManagerActor
 {
@@ -20,17 +21,29 @@ class SchedulingWindowManagerActor(override val m_controller : ActorRef, overrid
     
     override def receive =
     {
-        case WorkSuccess(work @ GetOptionsForFreeBlockWork(startTime, endTime, date, _, _, _, _, _, _, Some(topOptions)), _) => mainWindow.showOptionsForFreeBlock(startTime, endTime, date, topOptions)
+        case WorkSuccess(work @ GetOptionsForFreeBlockWork(startTime, endTime, date, _, _, _, _, _, _, Some(topOptions)), _) => getOptionsForFreeBlockWorkSuccess(startTime, endTime, date, topOptions)
 
         case WorkSuccess(GetCurrentScheduleWork(_, _, Some(schedule), Some(blocks)), _) => mainWindow.initializeWithData(schedule, blocks, this) //TODO maybe just change data on second time an on
 
         
         
-        case WorkSuccess(_ : FileWork, _) => mainWindow.askAndReloadData(this)
+        case WorkSuccess(_ : FileWork, _) =>
+        {
+            mainWindow.hideProgressIndicator(true)
+            mainWindow.askAndReloadData(this)
+        }
         
-        case WorkSuccess(work, message) => mainWindow.showSuccessDialog(message.getOrElse("Action succeed"))
+        case WorkSuccess(work, message) =>
+        {
+            mainWindow.hideProgressIndicator(true)
+            mainWindow.showSuccessDialog(message.getOrElse("Action succeed"))
+        }
 
-        case WorkFailure(work, cause, message) => mainWindow.showFailDialog(cause, message)
+        case WorkFailure(work, cause, message) =>
+        {
+            mainWindow.hideProgressIndicator(false)
+            mainWindow.showFailDialog(cause, message)
+        }
     }
     
     override def reloadDefaultData
@@ -38,6 +51,26 @@ class SchedulingWindowManagerActor(override val m_controller : ActorRef, overrid
         val now = LocalDate.now()
         getCurrentSchedule(now.minusDays(now.getDayOfWeek),
                            now.plusDays(6 - now.getDayOfWeek))
+    }
+    
+    def getOptionsForFreeBlockWorkSuccess(startTime : LocalTime,
+                                          endTime : LocalTime,
+                                          date : LocalDate,
+                                          topOptions : Seq[BlockFillingOption],
+                                  )
+    {
+        mainWindow.hideProgressIndicator(true)
+        getSettings.onComplete
+        {
+            case Success(settings) =>
+            {
+                mainWindow.showOptionsForFreeBlock(startTime, endTime, date, topOptions, settings)
+            }
+            case Failure(exception) =>
+            {
+                mainWindow.showFailDialog(Some(exception), Some("Failed to get setting, so options cannot be presented."))
+            }
+        }
     }
 }
 
@@ -48,6 +81,7 @@ trait SchedulingUserActions extends CommonUserActions
     def getSurgeriesSuggestions(startTime : LocalTime, endTime : LocalTime, date : LocalDate)
     {
         m_controller ! GetOptionsForFreeBlockWork(startTime, endTime, date)
+        mainWindow.showProgressIndicator("Get Options For Free Block")
     }
     
     def getCurrentSchedule(from : LocalDate, to : LocalDate)

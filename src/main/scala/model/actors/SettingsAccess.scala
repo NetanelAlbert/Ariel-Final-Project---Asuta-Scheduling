@@ -29,9 +29,11 @@ trait SettingsAccess
             case Success(settings : Settings) => Success(settings)
     
             case Success(value) =>
+            {
                 m_logger.info(s"expected ${Success.getClass} but got ${value.getClass}")
                 Failure(MismatchException(s"Expected Settings but found $value"))
-    
+            }
+            
             case Failure(exception) => Failure(exception)
         }
     }

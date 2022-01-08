@@ -19,7 +19,11 @@ trait CommonUserActions extends SettingsAccess
     val m_controller : ActorRef
     val mainWindow : MainWindowActions
     
-    def loadPastSurgeriesListener(file : File, keepOldMapping : Boolean) : Unit = m_controller ! ReadPastSurgeriesExcelWork(file, keepOldMapping)
+    def loadPastSurgeriesListener(file : File, keepOldMapping : Boolean)
+    {
+        m_controller ! ReadPastSurgeriesExcelWork(file, keepOldMapping)
+        mainWindow.showProgressIndicator("Load Past Surgeries")
+    }
     
     def loadProfitListener(file : File) : Unit = m_controller ! ReadProfitExcelWork(file)
     
@@ -29,7 +33,7 @@ trait CommonUserActions extends SettingsAccess
     
     def reloadDefaultData
     
-    def changeSetting(stage : Stage)
+    def changeSettingAndThen(stage : Stage)(onSuccessAction : Settings => Unit)
     {
         getSettings.onComplete
         {
@@ -48,6 +52,7 @@ trait CommonUserActions extends SettingsAccess
                                 case Success(_) =>
                                 {
                                     mainWindow.showSuccessDialog("Settings changed successfully.")
+                                    onSuccessAction(settings)
                                 }
                     
                                 case Failure(exception) =>
