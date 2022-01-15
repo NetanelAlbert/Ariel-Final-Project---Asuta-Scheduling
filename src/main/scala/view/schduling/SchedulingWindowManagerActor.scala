@@ -1,10 +1,13 @@
 package view.schduling
 
+import akka.Done
 import akka.actor.{Actor, ActorRef, Props}
+import akka.pattern.ask
+import model.DTOs.Priority.Priority
 import model.actors.MyActor
 import org.joda.time.{LocalDate, LocalTime}
-import view.common.{CommonUserActions, MainWindowActions}
-import work.{BlockFillingOption, FileWork, GetCurrentScheduleWork, GetOptionsForFreeBlockWork, ReadFutureSurgeriesExcelWork, WorkFailure, WorkSuccess}
+import view.common.{CommonUserActions, MainWindowActions, UiUtils}
+import work.{BlockFillingOption, FileWork, GetCurrentScheduleWork, GetOptionsForFreeBlockWork, ReadFutureSurgeriesExcelWork, UpdateDoctorPriority, WorkFailure, WorkSuccess}
 
 import java.io.File
 import scala.concurrent.{ExecutionContext, Future}
@@ -21,7 +24,7 @@ class SchedulingWindowManagerActor(override val m_controller : ActorRef, overrid
     
     override def receive =
     {
-        case WorkSuccess(work @ GetOptionsForFreeBlockWork(startTime, endTime, date, _, _, _, _, _, _, Some(topOptions)), _) => getOptionsForFreeBlockWorkSuccess(startTime, endTime, date, topOptions)
+        case WorkSuccess(work @ GetOptionsForFreeBlockWork(startTime, endTime, date, _, _, _, _, _, _, _, Some(topOptions)), _) => getOptionsForFreeBlockWorkSuccess(startTime, endTime, date, topOptions)
 
         case WorkSuccess(GetCurrentScheduleWork(_, _, Some(schedule), Some(blocks)), _) => mainWindow.initializeWithData(schedule, blocks, this) //TODO maybe just change data on second time an on
 
@@ -29,20 +32,20 @@ class SchedulingWindowManagerActor(override val m_controller : ActorRef, overrid
         
         case WorkSuccess(_ : FileWork, _) =>
         {
-            mainWindow.hideProgressIndicator(true)
+            mainWindow.hideProgressIndicator()
             mainWindow.askAndReloadData(this)
         }
         
         case WorkSuccess(work, message) =>
         {
-            mainWindow.hideProgressIndicator(true)
-            mainWindow.showSuccessDialog(message.getOrElse("Action succeed"))
+            mainWindow.hideProgressIndicator()
+            UiUtils.showSuccessDialog(message.getOrElse("Action succeed"))
         }
 
         case WorkFailure(work, cause, message) =>
         {
-            mainWindow.hideProgressIndicator(false)
-            mainWindow.showFailDialog(cause, message)
+            mainWindow.hideProgressIndicator()
+            UiUtils.showFailDialog(cause, message)
         }
     }
     
@@ -53,22 +56,28 @@ class SchedulingWindowManagerActor(override val m_controller : ActorRef, overrid
                            now.plusDays(6 - now.getDayOfWeek))
     }
     
-    def getOptionsForFreeBlockWorkSuccess(startTime : LocalTime,
-                                          endTime : LocalTime,
-                                          date : LocalDate,
-                                          topOptions : Seq[BlockFillingOption],
-                                  )
+    def updateDoctorPriority(doctorID : Int, priority : Priority) : Future[Done] =
     {
-        mainWindow.hideProgressIndicator(true)
+        m_settingActor ? UpdateDoctorPriority(doctorID, priority) map (_ => Done)
+    }
+    
+    def getOptionsForFreeBlockWorkSuccess(
+        startTime : LocalTime,
+        endTime : LocalTime,
+        date : LocalDate,
+        topOptions : Seq[BlockFillingOption],
+    )
+    {
+        mainWindow.hideProgressIndicator()
         getSettings.onComplete
         {
             case Success(settings) =>
             {
-                mainWindow.showOptionsForFreeBlock(startTime, endTime, date, topOptions, settings)
+                mainWindow.showOptionsForFreeBlock(startTime, endTime, date, topOptions, settings, updateDoctorPriority)
             }
             case Failure(exception) =>
             {
-                mainWindow.showFailDialog(Some(exception), Some("Failed to get setting, so options cannot be presented."))
+                UiUtils.showFailDialog(Some(exception), Some("Failed to get setting, so options cannot be presented."))
             }
         }
     }

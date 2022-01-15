@@ -2,6 +2,7 @@ package model.actors
 
 
 import akka.actor.{ActorRef, Props}
+import model.DTOs.Priority.Priority
 import model.DTOs._
 import model.probability.IntegerDistribution
 import org.joda.time.{DateTime, Duration, LocalDate, LocalDateTime, LocalTime}
@@ -25,7 +26,7 @@ class AnalyzeDataActor(m_controller : ActorRef,
     {
         case work : ReadPastSurgeriesExcelWork => readPastSurgeriesExcelWork(work, work.pasteSurgeries)
         
-        case work @ GetOptionsForFreeBlockWork(startTime, endTime, date, Some(doctorsWithSurgeries), Some(doctorMapping), Some(surgeryStatistics), Some(surgeryAvgInfo), Some(plannedSurgeries), Some(plannedSurgeryStatistics), _) => getOptionsForFreeBlockWork(work, doctorsWithSurgeries, doctorMapping, surgeryStatistics, surgeryAvgInfo, plannedSurgeries, plannedSurgeryStatistics, startTime, endTime, date)
+        case work @ GetOptionsForFreeBlockWork(startTime, endTime, date, Some(doctorsWithSurgeries), Some(doctorMapping), Some(surgeryStatistics), Some(surgeryAvgInfo), Some(plannedSurgeries), Some(plannedSurgeryStatistics), Some(doctorsPriorityMap), _) => getOptionsForFreeBlockWork(work, doctorsWithSurgeries, doctorMapping, surgeryStatistics, surgeryAvgInfo, plannedSurgeries, plannedSurgeryStatistics, doctorsPriorityMap, startTime, endTime, date)
     }
     
     def getOptionsForFreeBlockWork(work : GetOptionsForFreeBlockWork,
@@ -35,6 +36,7 @@ class AnalyzeDataActor(m_controller : ActorRef,
                                    surgeryAvgInfo : Seq[SurgeryAvgInfo],
                                    plannedSurgeries : Seq[FutureSurgeryInfo],
                                    plannedSurgeryStatistics : Seq[SurgeryStatistics],
+                                   doctorsPriorityMap : Map[Int, Priority],
                                    startTime : LocalTime,
                                    endTime : LocalTime,
                                    date : LocalDate)
@@ -59,7 +61,7 @@ class AnalyzeDataActor(m_controller : ActorRef,
             // The collections above, with scores for each one (e.g. the chance of resting beds shortage)
             val options = doctorsSacks.filter(_.nonEmpty).par.map
             {
-                getBlockFillingOptionMapper(settings, surgeryStatistics, doctorMapping, plannedSurgeriesRestingBedsDistributions, plannedSurgeriesHospitalizeBedsDistributions)
+                getBlockFillingOptionMapper(settings, surgeryStatistics, doctorMapping, plannedSurgeriesRestingBedsDistributions, plannedSurgeriesHospitalizeBedsDistributions, doctorsPriorityMap)
             }.toList
     
             m_controller ! WorkSuccess(work.copy(topOptions = Some(options)), Some(s"Found the top options for $startTime - $endTime"))
@@ -161,10 +163,13 @@ class AnalyzeDataActor(m_controller : ActorRef,
         sacks(W)
     }
     
-    def getBlockFillingOptionMapper(settings : Settings, surgeryStatistics : Seq[SurgeryStatistics], doctorMapping : Map[Int, String], plannedSurgeriesRestingBedsDistributions : Map[Int, IntegerDistribution], plannedSurgeriesHospitalizeBedsDistributions : Map[Int, IntegerDistribution]) : Seq[SurgeryAvgInfoByDoctor] => BlockFillingOption =
+    def getBlockFillingOptionMapper(settings : Settings, surgeryStatistics : Seq[SurgeryStatistics], doctorNameMapping : Map[Int, String], plannedSurgeriesRestingBedsDistributions : Map[Int, IntegerDistribution], plannedSurgeriesHospitalizeBedsDistributions : Map[Int, IntegerDistribution], doctorsPriorityMap : Map[Int, Priority]) : Seq[SurgeryAvgInfoByDoctor] => BlockFillingOption =
     {
         val operationToSurgeryBasicInfoMapping = surgeryStatistics.map(surgery => surgery.operationCode -> surgery.basicInfo).toMap
-        val operationToProfitMapping = surgeryStatistics.map(surgery => surgery.operationCode -> surgery.profit).toMap
+        val operationToProfitMapping = surgeryStatistics.flatMap
+        {
+            surgery => surgery.profit.map(profit => surgery.operationCode -> profit)
+        }.toMap
         val operationToRestingDistributionMapping = surgeryStatistics.map(surgery => surgery.operationCode -> surgery.restingDistribution).toMap
         val operationToHospitalizationDistributionMapping = surgeryStatistics.map(surgery => surgery.operationCode -> surgery.hospitalizationDistribution).toMap
         
@@ -196,19 +201,20 @@ class AnalyzeDataActor(m_controller : ActorRef,
             }
             val chanceForHospitalizeShort = totalHospitalizeBedsDistribution.map(_.indicatorLessThenEq(totalNumberOfHospitalizeBeds).no).max
     
-            val expectedProfitTry = Try
+            val expectedProfitOption = settings.avgSurgeryProfit.map
             {
-                surgeryAvgInfoByDoctorSeq.map(surgery => operationToProfitMapping(surgery.operationCode).orElse(settings.avgSurgeryProfit).get).sum
+                avgSurgeryProfit => surgeryAvgInfoByDoctorSeq.map(surgery => operationToProfitMapping.getOrElse(surgery.operationCode, avgSurgeryProfit)).sum
             }
     
             val firstSurgery = surgeryAvgInfoByDoctorSeq.head
             BlockFillingOption(
                 doctorId = firstSurgery.doctorId,
-                doctorName = doctorMapping.get(firstSurgery.doctorId),
+                doctorName = doctorNameMapping.get(firstSurgery.doctorId),
                 surgeries = surgeryAvgInfoByDoctorSeq.map(_.operationCode).map(operationToSurgeryBasicInfoMapping(_)),
                 chanceForRestingShort = round(chanceForRestingShort, 2),
                 chanceForHospitalizeShort = round(chanceForHospitalizeShort, 2),
-                expectedProfit = expectedProfitTry.toOption
+                expectedProfit = expectedProfitOption,
+                doctorPriority = doctorsPriorityMap(firstSurgery.doctorId)
                 )
         }
     

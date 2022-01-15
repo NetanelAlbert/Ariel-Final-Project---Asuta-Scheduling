@@ -4,7 +4,8 @@ import akka.Done
 import akka.pattern.ask
 import akka.util.Timeout
 import model.DTOs.Settings
-import work.{GiveMeSettingsWork, SetSettingsWork}
+import model.database.DoctorPriorityAndName
+import work.{GetDoctorPriorityAndName, GiveMeSettingsWork, SetSettingsWork}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.DurationInt
@@ -30,7 +31,7 @@ trait SettingsAccess
     
             case Success(value) =>
             {
-                m_logger.info(s"expected ${Success.getClass} but got ${value.getClass}")
+                m_logger.error(s"expected ${Settings.getClass} but got ${value.getClass}")
                 Failure(MismatchException(s"Expected Settings but found $value"))
             }
             
@@ -43,4 +44,22 @@ trait SettingsAccess
         val setSettingsFuture = m_settingActor ? SetSettingsWork(settings)
         setSettingsFuture.map(_ => Done)
     }
+    
+    def getDoctorPriorityAndNames() : Future[Seq[DoctorPriorityAndName]] =
+    {
+        val settingsFuture = m_settingActor ? GetDoctorPriorityAndName
+        settingsFuture.transform
+        {
+            case Success(doctorsPriorityAndNames : Seq[DoctorPriorityAndName]) => Success(doctorsPriorityAndNames)
+        
+            case Success(value) =>
+            {
+                m_logger.error(s"expected ${DoctorPriorityAndName.getClass} but got ${value.getClass}")
+                Failure(MismatchException(s"Expected Settings but found $value"))
+            }
+        
+            case Failure(exception) => Failure(exception)
+        }
+    }
+    
 }

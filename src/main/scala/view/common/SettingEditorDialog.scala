@@ -1,9 +1,7 @@
 package view.common
 
-import javafx.beans.binding.Bindings
-import model.DTOs.{Settings, SettingsObject, SurgeryBasicInfo}
+import model.DTOs.{Settings, SettingsObject}
 import scalafx.Includes.jfxDialogPane2sfx
-import scalafx.collections.ObservableBuffer
 import scalafx.geometry.Insets
 import scalafx.scene.control.Alert.AlertType
 import scalafx.scene.control.ButtonBar.ButtonData
@@ -12,11 +10,8 @@ import scalafx.scene.control.{Alert, ButtonType, Dialog, Label, ListCell, ListVi
 import scalafx.scene.image.{Image, ImageView}
 import scalafx.scene.layout.GridPane
 import scalafx.stage.Stage
-import scalafx.util.{Duration, StringConverter}
+import scalafx.util.StringConverter
 import view.common.SettingEditorDialog.SettingsGridPane
-import work.BlockFillingOption
-
-import scala.io.Source
 import scala.util.Try
 
 class SettingEditorDialog(stage : Stage, settings : Settings) extends Dialog[Settings]
@@ -41,19 +36,14 @@ class SettingEditorDialog(stage : Stage, settings : Settings) extends Dialog[Set
             }
             else if (dialogButton == resetButtonType)
             {
-                val alert = new Alert(AlertType.Confirmation) {
-                    initOwner(stage)
-                    title = "Reset Settings"
-                    headerText = "Are you sure you want to reset settings to default? \nThin can't be undone."
-                }
-    
-                val result = alert.showAndWait()
-    
-                result match {
-                    case Some(ButtonType.OK) => SettingsObject.default
-                    
-                    case _ => null
-                }
+                UiUtils.showAlertAndPerform(
+                    stage,
+                    "Reset Settings",
+                    "Are you sure you want to reset settings to default? \nThis can't be undone.",
+                    )
+                {
+                    SettingsObject.default
+                }.orNull
             }
             else
             {
@@ -250,5 +240,5 @@ object SettingEditorDialog
         }
     }
     
-    val infoImage = new Image("info-icon-50.png")
+    val infoImage = new Image("icons/info-icon-50.png")
 }

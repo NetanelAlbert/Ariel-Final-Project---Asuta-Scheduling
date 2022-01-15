@@ -1,5 +1,18 @@
 package model.DTOs
 
+import model.DTOs.Priority.Priority
+
+object Priority extends Enumeration
+{
+    type Priority = Value
+    
+    val
+    STAR,
+    NORMAL,
+    HIDDEN
+    = Value
+}
+
 case class DoctorStatistics
 (
     id : Int,
@@ -9,6 +22,7 @@ case class DoctorStatistics
     surgeryDurationAvgMinutes : Double,
     restingDurationAvgMinutes : Double,
     hospitalizationDurationAvgHours : Double,
+    priority : Priority = Priority.NORMAL,
 )
 {
     def nameOrId : String = name.getOrElse(s"$id (id)")

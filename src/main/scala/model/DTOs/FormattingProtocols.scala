@@ -1,5 +1,6 @@
 package model.DTOs
 
+import model.DTOs.Priority.Priority
 import model.probability.IntegerDistribution
 import org.apache.commons.math3.distribution.EnumeratedIntegerDistribution
 import org.joda.time.{Days, LocalTime}
@@ -15,7 +16,7 @@ object FormattingProtocols
     import spray.json._
     
     
-    implicit val DoctorStatisticsFormat = jsonFormat7(DoctorStatistics.apply)
+//    implicit val DoctorStatisticsFormat = jsonFormat8(DoctorStatistics.apply)
     
     implicit val IntegerDistributionMapping = MappedColumnType.base[IntegerDistribution, String](
         distribution => distribution.m_distribution.toList.toJson.toString,
@@ -30,5 +31,8 @@ object FormattingProtocols
         time => 60 * time.getHourOfDay + time.getMinuteOfHour,
         minutes => new LocalTime(minutes / 60, minutes % 60))
     
-    
+    implicit val priorityMapping = MappedColumnType.base[Priority, String](
+        _.toString,
+        Priority.withName
+        )
 }

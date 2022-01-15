@@ -10,6 +10,7 @@ class SchedulingMenu(loadPastSurgeriesListener : EventHandler[ActionEvent],
                      loadSurgeryIDMappingListener : EventHandler[ActionEvent],
                      loadScheduleListener : EventHandler[ActionEvent],
                      changeSettingsListener : EventHandler[ActionEvent],
+                     changeDoctorsPrioritiesListener : EventHandler[ActionEvent],
                     ) extends MenuBar
 {
 //    prefWidth = Screen.primary.bounds.width
@@ -25,7 +26,8 @@ class SchedulingMenu(loadPastSurgeriesListener : EventHandler[ActionEvent],
     val loadScheduleItem = menuItem("Load Schedule", loadScheduleListener)
     fileMenu.items = List(loadDataMenu,
                           loadScheduleItem,
-                          menuItem("Settings", changeSettingsListener)
+                          menuItem("Settings", changeSettingsListener),
+                          menuItem("Doctors Priorities", changeDoctorsPrioritiesListener),
                           )
     
     menus = List(fileMenu)

@@ -1,6 +1,5 @@
 package model.DTOs
 
-import work.BlockFillingOption
 
 case class Settings(
     doctorRankingProfitWeight : Int,
@@ -31,30 +30,6 @@ case class Settings(
     avgSurgeryProfit : Option[Int],
     avgDoctorProfit : Option[Int],
 )
-{
-    def blockOptionGlobalScore(option : BlockFillingOption, profitNormalizer : Int => Double) : Double =
-    {
-        val weightedResting = (1 - option.chanceForRestingShort) * blockOptionsRestingShortWeight
-        val weightedHospitalize = (1 - option.chanceForHospitalizeShort) * blockOptionsHospitalizeShortWeight
-    
-        option.expectedProfit match
-        {
-            case Some(expectedProfit) =>
-            {
-                val weightedProfit = profitNormalizer(expectedProfit) * blockOptionsProfitWeight
-                val weightedSum =  weightedResting + weightedHospitalize + weightedProfit
-                val div = blockOptionsRestingShortWeight + blockOptionsHospitalizeShortWeight + blockOptionsProfitWeight
-                weightedSum / div
-            }
-            case None =>
-            {
-                val weightedSum =  weightedResting + weightedHospitalize
-                val div = blockOptionsRestingShortWeight + blockOptionsHospitalizeShortWeight
-                weightedSum / div
-            }
-        }
-    }
-}
 
 object SettingsObject
 {

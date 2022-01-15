@@ -160,17 +160,22 @@ class DatabaseActor(m_controller : ActorRef, m_modelManager : ActorRef)(implicit
         {
             settings <- getSettings
             
-            availableDoctorsIDs <- doctorAvailabilityTable.getAvailableDoctorsIDs(date.getDayOfWeek).flatMap
+            doctorIDsNotHidden <- doctorStatisticsTable.getDoctorsIDsWithNotHiddenPriority()//TODO remove +1
+            availableDoctorsIDs <- doctorAvailabilityTable.getAvailableDoctorsIDs(date.getDayOfWeek + 1).flatMap
             {
-                case result if result.isEmpty =>
+                case result if result.intersect(doctorIDsNotHidden).isEmpty =>
                 {
                     m_logger.warning(s"Didn't find any doctor available in day: ${date.dayOfWeek().getAsText} in table doctorAvailabilityTable for work: $work")
+                    println(s"NA:: result: $result")
                     doctorAvailabilityTable.selectAll().map(_.map(_.doctorId))
                 }
 
                 case result => Future.successful(result)
             }
-            doctorsWithSurgeries <- surgeryAvgInfoByDoctorTable.getSurgeriesByDoctors(availableDoctorsIDs)
+            
+            availableNotHiddenDoctorsIDs = availableDoctorsIDs intersect doctorIDsNotHidden
+            
+            doctorsWithSurgeries <- surgeryAvgInfoByDoctorTable.getSurgeriesByDoctors(availableNotHiddenDoctorsIDs)
     
             doctorMapping <- doctorStatisticsTable.getDoctorMapping(doctorsWithSurgeries.keySet)
     
@@ -184,12 +189,16 @@ class DatabaseActor(m_controller : ActorRef, m_modelManager : ActorRef)(implicit
                                              .map(_.filter(! _.released))
             plannedSurgeriesIDs = plannedSurgeries.map(_.operationCode).toSet
             plannedSurgeryStatistics <- surgeryStatisticsTable.getByIDsAndValidateSize(plannedSurgeriesIDs)
+
+            doctorsPriorityMap <- doctorStatisticsTable.getDoctorsPriority()
         } yield work.copy(doctorsWithSurgeries = Some(doctorsWithSurgeries),
                           doctorMapping = Some(doctorMapping),
                           surgeryStatistics = Some(surgeryStatistics),
                           surgeryAvgInfo = Some(surgeryAvgInfo),
                           plannedSurgeries = Some(plannedSurgeries),
-                          plannedSurgeryStatistics = Some(plannedSurgeryStatistics))
+                          plannedSurgeryStatistics = Some(plannedSurgeryStatistics),
+                          doctorsPriorityMap = Some(doctorsPriorityMap)
+                          )
         
         copyWork.onComplete
         {

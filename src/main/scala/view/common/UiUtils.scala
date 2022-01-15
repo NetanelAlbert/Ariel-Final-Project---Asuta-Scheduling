@@ -1,9 +1,10 @@
 package view.common
 
+import model.DTOs.SettingsObject
 import scalafx.application.Platform
 import scalafx.scene.control.Alert.AlertType
 import scalafx.scene.control.{Alert, ButtonType}
-import scalafx.stage.{FileChooser, Stage}
+import scalafx.stage.{FileChooser, Stage, Window}
 import view.schduling.SchedulingUserActions
 
 import java.io.File
@@ -88,6 +89,47 @@ object UiUtils
             case Some(RemoveButton)   => userActions.loadScheduleListener(file, false)
             
             case _ => // Do nothing
+        }
+    }
+    
+    def showSuccessDialog(message : String)
+    {
+        Platform.runLater
+        {
+            new Alert(AlertType.Information, message).showAndWait()
+        }
+    }
+    
+    def showFailDialog(message : String)
+    {
+        Platform.runLater
+        {
+            new Alert(AlertType.Error, message).showAndWait()
+        }
+    }
+    
+    def showFailDialog(cause : Option[Throwable], message : Option[String])
+    {
+        showFailDialog(
+            s"""Action failed.
+               |Message: ${message.getOrElse("")}.
+               |Cause: ${cause.map(_.getMessage).getOrElse("unknown")}""".stripMargin)
+    }
+    
+    def showAlertAndPerform[T](m_window : Window, m_title : String, m_message : String)(action : => T) : Option[T] =
+    {
+        val alert = new Alert(AlertType.Confirmation) {
+            initOwner(m_window)
+            title = m_title
+            headerText = m_message
+        }
+    
+        val result = alert.showAndWait()
+    
+        result match {
+            case Some(ButtonType.OK) => Some(action)
+        
+            case _ => None
         }
     }
 }

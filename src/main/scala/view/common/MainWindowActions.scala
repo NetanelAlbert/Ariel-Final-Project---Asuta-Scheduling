@@ -9,34 +9,10 @@ trait MainWindowActions
 {
     def stage : Stage
     
-    def showSuccessDialog(message : String)
-    {
-        Platform.runLater
-        {
-            new Alert(AlertType.Information, message).showAndWait()
-        }
-    }
-    
-    def showFailDialog(message : String)
-    {
-        Platform.runLater
-        {
-            new Alert(AlertType.Error, message).showAndWait()
-        }
-    }
-    
-    def showFailDialog(cause : Option[Throwable], message : Option[String])
-    {
-        showFailDialog(
-            s"""Action failed.
-              |Message: ${message.getOrElse(None)}.
-              |Cause: ${cause.map(_.getMessage).getOrElse("unknown")}""".stripMargin)
-    }
-    
     
     def askAndReloadData(userAction : CommonUserActions)
     {
-        hideProgressIndicator(true)
+        hideProgressIndicator()
         System.gc()
         Platform.runLater
         {
@@ -65,13 +41,14 @@ trait MainWindowActions
     {
         Platform.runLater
         {
+            m_progressDialog.foreach(_.delegate.close())
             val progressDialog = new ProgressDialog(stage, progress)
             m_progressDialog = Some(progressDialog)
             progressDialog.showAndWait()
         }
     }
     
-    def hideProgressIndicator(status : Boolean)
+    def finishProgressIndicator(status : Boolean)
     {
         Platform.runLater
         {
@@ -79,6 +56,15 @@ trait MainWindowActions
             {
                 progressDialog.finish(status)
             })
+            m_progressDialog = None
+        }
+    }
+    
+    def hideProgressIndicator()
+    {
+        Platform.runLater
+        {
+            m_progressDialog.foreach(_.delegate.close())
             m_progressDialog = None
         }
     }

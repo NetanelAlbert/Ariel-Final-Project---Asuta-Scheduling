@@ -7,7 +7,7 @@ import org.joda.time.LocalTime
 import scalafx.application.Platform
 import scalafx.scene.control.{Alert, ButtonType}
 import scalafx.scene.control.Alert.AlertType
-import view.common.{CommonUserActions, MainWindowActions}
+import view.common.{CommonUserActions, MainWindowActions, UiUtils}
 import work._
 
 import java.io.File
@@ -27,26 +27,26 @@ class StatisticsWindowManagerActor(override val m_controller : ActorRef, overrid
     {
         case WorkSuccess(GetDoctorsStatisticsWork(Some(doctorsBaseStatistics), Some(surgeryAvgInfoByDoctorMap), Some(surgeryAvgInfoList), Some(operationCodeAndNames)), _) =>
         {
-            mainWindow.hideProgressIndicator(true)
+            mainWindow.hideProgressIndicator()
             getDoctorsStatisticsWork(doctorsBaseStatistics, surgeryAvgInfoByDoctorMap, surgeryAvgInfoList, operationCodeAndNames)
         }
         
         case WorkSuccess(_ : FileWork, _) =>
         {
-            mainWindow.hideProgressIndicator(true)
+            mainWindow.hideProgressIndicator()
             mainWindow.askAndReloadData(this)
         }
 
         case WorkSuccess(work, message) =>
         {
-            mainWindow.hideProgressIndicator(true)
-            mainWindow.showSuccessDialog(message.getOrElse("Action succeed"))
+            mainWindow.hideProgressIndicator()
+            UiUtils.showSuccessDialog(message.getOrElse("Action succeed"))
         }
 
         case WorkFailure(work, cause, message) =>
         {
-            mainWindow.hideProgressIndicator(false)
-            mainWindow.showFailDialog(cause, message)
+            mainWindow.hideProgressIndicator()
+            UiUtils.showFailDialog(cause, message)
         }
     }
     

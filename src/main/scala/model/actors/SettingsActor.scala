@@ -1,12 +1,14 @@
 package model.actors
 
+import akka.Done
 import akka.actor.{ActorRef, Props}
+import model.DTOs.Priority.Priority
 import model.DTOs._
 import model.actors.SettingsActor.SettingsException
 import model.database._
 import work._
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 object SettingsActor
@@ -22,6 +24,7 @@ class SettingsActor()(implicit ec : ExecutionContext) extends MyActor
     
     val doctorAvailabilityTable = new DoctorAvailabilityTable(m_db)
     val settingsTable = new SettingsTable(m_db)
+    val doctorStatisticsTable = new DoctorStatisticsTable(m_db)
     
     override def receive =
     {
@@ -32,6 +35,12 @@ class SettingsActor()(implicit ec : ExecutionContext) extends MyActor
         case work @ GiveMeSettingsWork(responseTo, _) => giveMeSettingsWork(work, responseTo)
         
         case work @ SetSettingsWork(settings) => setSettingsWork(work, settings)
+
+        case UpdateDoctorPriority(doctorID, priority) => updateDoctorPriority(doctorID, priority)
+
+        case UpdateDoctorsPriority(doctorsPriority) => updateDoctorsPriority(doctorsPriority)
+
+        case GetDoctorPriorityAndName => getDoctorPriorityAndName()
     }
     
     def addDoctorAvailabilityWork(work : AddDoctorAvailabilityWork, doctorAvailability : DoctorAvailability)
@@ -81,6 +90,31 @@ class SettingsActor()(implicit ec : ExecutionContext) extends MyActor
             case Success(_) => responseActor ! Success(work)
         
             case Failure(exception) => responseActor ! Failure(SettingsException(exception, "Can't set new settings in DB"))
+        }
+    }
+    
+    def updateDoctorPriority(doctorID : Int, priority : Priority)
+    {
+        updateDoctorsPriority(Seq(doctorID -> priority))
+    }
+    
+    def updateDoctorsPriority(doctorsPriority : Iterable[(Int, Priority)])
+    {
+        val responseActor = sender()
+        doctorStatisticsTable.setDoctorsPriority(doctorsPriority).onComplete
+        {
+            case Success(_) => responseActor ! Done
+            case Failure(exception) => responseActor ! akka.actor.Status.Failure(exception)
+        }
+    }
+    
+    def getDoctorPriorityAndName()
+    {
+        val responseActor = sender()
+        doctorStatisticsTable.getDoctorsPriorityAndNames().onComplete
+        {
+            case Success(doctorPriorityAndNames) => responseActor ! doctorPriorityAndNames
+            case Failure(exception) => responseActor ! akka.actor.Status.Failure(exception)
         }
     }
 }

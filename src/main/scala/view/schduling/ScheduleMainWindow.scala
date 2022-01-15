@@ -1,7 +1,9 @@
 package view.schduling
 
+import akka.Done
 import akka.actor.ActorSystem
 import controller.Controller
+import model.DTOs.Priority.Priority
 import model.DTOs._
 import org.joda.time.{LocalDate, LocalTime}
 import org.joda.time.format.DateTimeFormat
@@ -21,7 +23,7 @@ import view.schduling.windowElements.{ShowOptionsBlocksDialog, TableScene}
 import work.{BlockFillingOption, GetOptionsForFreeBlockWork}
 
 import java.io.File
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 object ScheduleMainWindow extends JFXApp3 with SchedulingMainWindowActions
 {
@@ -71,15 +73,18 @@ object ScheduleMainWindow extends JFXApp3 with SchedulingMainWindowActions
         super.stopApp()
     }
     
-    def showOptionsForFreeBlock(startTime : LocalTime,
-                                endTime : LocalTime,
-                                date : LocalDate,
-                                topOptions : Seq[BlockFillingOption],
-                                settings : Settings)
+    def showOptionsForFreeBlock(
+        startTime : LocalTime,
+        endTime : LocalTime,
+        date : LocalDate,
+        topOptions : Seq[BlockFillingOption],
+        settings : Settings,
+        updateDoctorPriority : (Int, Priority) => Future[Done],
+    )(implicit ec : ExecutionContext)
     {
         Platform.runLater
         {
-            val dialog = new ShowOptionsBlocksDialog(stage, startTime, endTime, date, topOptions, settings)
+            val dialog = new ShowOptionsBlocksDialog(stage, startTime, endTime, date, topOptions, settings, updateDoctorPriority)
             dialog.showAndWait()
         }
     }

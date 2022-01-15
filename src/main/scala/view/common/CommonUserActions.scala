@@ -1,13 +1,15 @@
 package view.common
 
 import akka.actor.ActorRef
+import akka.pattern.ask
+import model.DTOs.Priority.Priority
 import model.DTOs.Settings
 import model.actors.{MyActor, SettingsAccess}
 import scalafx.application.Platform
 import scalafx.scene.control.Alert
 import scalafx.scene.control.Alert.AlertType
 import scalafx.stage.Stage
-import work.{ReadDoctorsMappingExcelWork, ReadPastSurgeriesExcelWork, ReadProfitExcelWork, ReadSurgeryMappingExcelWork}
+import work.{ReadDoctorsMappingExcelWork, ReadPastSurgeriesExcelWork, ReadProfitExcelWork, ReadSurgeryMappingExcelWork, UpdateDoctorsPriority}
 
 import java.io.File
 import scala.util.{Failure, Success}
@@ -51,7 +53,7 @@ trait CommonUserActions extends SettingsAccess
                             {
                                 case Success(_) =>
                                 {
-                                    mainWindow.showSuccessDialog("Settings changed successfully.")
+                                    UiUtils.showSuccessDialog("Settings changed successfully.")
                                     onSuccessAction(settings)
                                 }
                     
@@ -59,7 +61,7 @@ trait CommonUserActions extends SettingsAccess
                                 {
                                     val errorInfo = "Failed to change settings."
                                     log.error(exception, errorInfo)
-                                    mainWindow.showFailDialog(errorInfo)
+                                    UiUtils.showFailDialog(Some(exception), Some(errorInfo))
                                 }
                             }
                         }
@@ -73,7 +75,52 @@ trait CommonUserActions extends SettingsAccess
             {
                 val errorInfo = "Failed to get current settings."
                 log.error(exception, errorInfo)
-                mainWindow.showFailDialog(errorInfo)
+                UiUtils.showFailDialog(Some(exception), Some(errorInfo))
+            }
+        }
+    }
+    
+    def changeDoctorsPrioritiesAndThen(stage : Stage)(onSuccessAction : => Unit)
+    {
+        getDoctorPriorityAndNames().onComplete
+        {
+            case Success(doctorsPriorityAndNames) =>
+            {
+                Platform.runLater
+                {
+                    val priorityEditorDialog = new PriorityEditorDialog(stage, doctorsPriorityAndNames)
+                    val result = priorityEditorDialog.showAndWait()
+                    result match
+                    {
+                        case Some(doctorsPriority : Iterable[(Int, Priority)]) =>
+                        {
+                            (m_settingActor ? UpdateDoctorsPriority(doctorsPriority)).onComplete
+                            {
+                                case Success(_) =>
+                                {
+                                    UiUtils.showSuccessDialog("Doctors priorities changed successfully.")
+                                    onSuccessAction
+                                }
+                    
+                                case Failure(exception) =>
+                                {
+                                    val errorInfo = "Failed to change doctors priorities."
+                                    log.error(exception, errorInfo)
+                                    UiUtils.showFailDialog(Some(exception), Some(errorInfo))
+                                }
+                            }
+                        }
+            
+                        case None => log.info("changeSetting dialog close without action")
+                    }
+                }
+            }
+            
+            case Failure(exception) =>
+            {
+                val errorInfo = "Failed to get current settings."
+                log.error(exception, errorInfo)
+                UiUtils.showFailDialog(Some(exception), Some(errorInfo))
             }
         }
     }

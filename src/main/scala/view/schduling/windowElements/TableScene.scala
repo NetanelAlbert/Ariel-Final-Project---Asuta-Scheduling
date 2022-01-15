@@ -56,6 +56,13 @@ class TableScene(futureSurgeryInfo : Iterable[FutureSurgeryInfo],
             }
         }
     }
+    def changeDoctorsPriorities
+    {
+        userActions.changeDoctorsPrioritiesAndThen(stage)
+        {
+        
+        }
+    }
     
     val menu = new SchedulingMenu(
         loadPastSurgeriesListener = _ => loadPastSurgeriesAndCall(askIfToKeepMappingAndLoadPastSurgeries(stage, userActions)),
@@ -63,7 +70,8 @@ class TableScene(futureSurgeryInfo : Iterable[FutureSurgeryInfo],
         loadSurgeryIDMappingListener = _ => loadSurgeryIDMappingAndCall(userActions.loadSurgeryIDMappingListener),
         loadDoctorsIDMappingListener = _ => loadDoctorsIDMappingAndCall(userActions.loadDoctorsIDMappingListener),
         loadScheduleListener = _ => loadScheduleAndCall(UiUtils.askIfToKeepMappingAndLoadSchedule(stage, userActions)),
-        changeSettingsListener = _ => changeSetting
+        changeSettingsListener = _ => changeSetting,
+        changeDoctorsPrioritiesListener = _ => changeDoctorsPriorities,
         )
     
     val prevButton = new Button("<")

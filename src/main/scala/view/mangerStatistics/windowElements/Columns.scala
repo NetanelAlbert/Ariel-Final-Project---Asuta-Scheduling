@@ -211,12 +211,18 @@ object Cells
 
 object Styles
 {
+    val CENTER_BOLD = """-fx-alignment: center;
+                        |-fx-font-weight: bolder;""".stripMargin
+    
+    val TRANSPARENT_GREEN = "rgba(0, 200 ,0 , 0.4)"
+    val TRANSPARENT_ORANGE = "rgba(244, 164, 96, 0.4)"
+    val TRANSPARENT_RED = "rgba(255, 50, 71, 0.4)"
     def trafficLightsBackground(value : Int) : String =
     {
         val color =
-            if(value > 66) "palegreen"
-            else if(value > 33) "sandybrown"
-            else "tomato"
+            if(value > 66) TRANSPARENT_GREEN
+            else if(value > 33) TRANSPARENT_ORANGE
+            else TRANSPARENT_RED
         
         s"""-fx-background-color: $color;
            | -fx-alignment: center;

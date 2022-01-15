@@ -38,4 +38,19 @@ object Utils
     {
         seq.map(value => mapBy(value) -> value).toMap
     }
+    
+    def cache[T](cacheOption : Option[T], setCache : T => Unit)(generateValue : => T) : T =
+    {
+        cacheOption match
+        {
+            case Some(value) => value
+            
+            case None =>
+            {
+                val newValue = generateValue
+                setCache(newValue)
+                newValue
+            }
+        }
+    }
 }
