@@ -181,12 +181,9 @@ class ShowOptionsBlocksDialog(
                                 case Priority.HIDDEN => Priority.HIDDEN
                             }
                             updateDoctorPriority(blockFillingOption.doctorId, newPriority, index)
-                            println(s"PRIMARY. index = $index. m_doctorID = ${blockFillingOption.doctorId}. newPriority = $newPriority")
-                            //todo star/unstar item in the list and in setting (DB)
                         }
                         else if(event.getButton == MouseButton.SECONDARY)
                         {
-                            //todo remove item from the list and mark hidden in setting (DB)
                             UiUtils.showAlertAndPerform(
                                 stage,
                                 "Hide doctor?",

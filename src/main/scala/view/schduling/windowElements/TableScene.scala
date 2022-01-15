@@ -9,13 +9,15 @@ import scalafx.Includes.jfxDialogPane2sfx
 import scalafx.geometry.{Insets, Pos}
 import scalafx.scene.Scene
 import scalafx.scene.control.{Button, ButtonType, ComboBox, DatePicker, Dialog, Label}
-import scalafx.scene.layout.{BorderPane, GridPane, HBox, Priority, StackPane, VBox}
+import scalafx.scene.layout.{BorderPane, GridPane, HBox, Priority, Region, StackPane, VBox}
 import scalafx.stage.{Screen, Stage}
 import scalafx.util.StringConverter
 import view.common.UiUtils
 import view.common.UiUtils.{askIfToKeepMappingAndLoadPastSurgeries, getPathFromUserAndCall}
 import view.schduling.SchedulingUserActions
 import common.Utils._
+import scalafx.scene.image.{Image, ImageView}
+import view.mangerStatistics.windowElements.Styles
 
 import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
@@ -74,10 +76,11 @@ class TableScene(futureSurgeryInfo : Iterable[FutureSurgeryInfo],
         changeDoctorsPrioritiesListener = _ => changeDoctorsPriorities,
         )
     
-    val prevButton = new Button("<")
+    val prevButton = new ImageView(new Image("icons/back-circle-50.png", 25, 25, true, true))
     {
-        prefWidth = 150
-        onAction = _ =>
+//        prefWidth = 150
+        pickOnBounds = true
+        onMouseClicked = _ =>
         {
             m_table.dayBefore
             resetTodayButton()
@@ -87,23 +90,24 @@ class TableScene(futureSurgeryInfo : Iterable[FutureSurgeryInfo],
     val todayPicker = new DatePicker(jodaToJava(m_table.date))
     {
         prefWidth = 500
-        alignmentInParent = Pos.Center
-        
+        margin = Insets(0, 10, 0, 10)
         onAction = _ =>
         {
-            m_table.date = javaToJoda(value.apply)
+            m_table.date = javaToJoda(value())
             resetTodayButton()
         }
     }
+    
     def resetTodayButton()
     {
         todayPicker.value = jodaToJava(m_table.date)
     }
     
-    val nextButton = new Button(">")
+    val nextButton = new ImageView(new Image("icons/next-circle-50.png", 25, 25, true, true))
     {
-        prefWidth = 150
-        onAction = _ =>
+//        prefWidth = 150
+        pickOnBounds = true
+        onMouseClicked = _ =>
         {
             m_table.nextDay
             resetTodayButton()
@@ -113,11 +117,8 @@ class TableScene(futureSurgeryInfo : Iterable[FutureSurgeryInfo],
     val suggestionsButton = new Button("Get Suggestions")
     {
         onAction = _ => showGetSuggestionsDialog
-//        prefWidth = 500
-        margin = Insets(0, 50, 0, 500)
-        style =
-            """-fx-font-weight: bold;
-              |-fx-font-size: 15;""".stripMargin
+        margin = Insets(0, 50, 0, 0)
+        style = Styles.centerBoldSize(15)
     }
     
     val dateHBox = new HBox(prevButton, todayPicker, nextButton)
@@ -126,12 +127,14 @@ class TableScene(futureSurgeryInfo : Iterable[FutureSurgeryInfo],
     }
 //    dateHBox.setAlignment(Pos.Center)
     
-    val hBox = new HBox(menu, dateHBox, suggestionsButton)
+    val space1 = new Region()
+    val space2 = new Region()
+    val hBox = new HBox(menu, space1, dateHBox, space2, suggestionsButton)
     {
             prefWidth = Screen.primary.bounds.width
     }
-    //    HBox.setHgrow(menu, Priority.Always)
-    //    HBox.setHgrow(suggestionsButton, Priority.Never)
+    HBox.setHgrow(space1, Priority.Always)
+    HBox.setHgrow(space2, Priority.Always)
     
     // Create Table
     val stackPane = new StackPane()

@@ -214,6 +214,10 @@ object Styles
     val CENTER_BOLD = """-fx-alignment: center;
                         |-fx-font-weight: bolder;""".stripMargin
     
+    def centerBoldSize(size : Int) : String =
+        s"""$CENTER_BOLD
+           |-fx-font-size: $size;""".stripMargin
+    
     val TRANSPARENT_GREEN = "rgba(0, 200 ,0 , 0.4)"
     val TRANSPARENT_ORANGE = "rgba(244, 164, 96, 0.4)"
     val TRANSPARENT_RED = "rgba(255, 50, 71, 0.4)"
