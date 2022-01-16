@@ -228,8 +228,8 @@ class AnalyzeDataActor(m_controller : ActorRef,
         {
             settings <- getSettings
             monthsToGoBack = settings.doctorAvailabilityMonthsToGoBack
-            threshold = LocalDateTime.now().minusMonths(monthsToGoBack)
-            doctorAvailability = pasteSurgeries.filter(_.blockStart.isAfter(threshold)).map(surgery => DoctorAvailability(surgery.doctorId, surgery.blockStart.getDayOfWeek)).toSet
+            threshold = LocalDateTime.now().minusMonths(monthsToGoBack).toDate.getTime
+            doctorAvailability = pasteSurgeries.filter(_.blockStartMillis > threshold).map(surgery => DoctorAvailability(surgery.doctorId, new LocalDateTime(surgery.blockStartMillis).getDayOfWeek)).toSet
         } yield  doctorAvailability
     }
     
@@ -376,7 +376,7 @@ class AnalyzeDataActor(m_controller : ActorRef,
     
     def addSurgeryInfoToTuple(tuple : (Int, Int, Int), surgeryInfo : PastSurgeryInfo) : (Int, Int, Int) = surgeryInfo match
     {
-        case PastSurgeryInfo(_, _, surgeryDurationMinutes, restingMinutes, hospitalizationHours, _, _) =>
+        case PastSurgeryInfo(_, _, surgeryDurationMinutes, restingMinutes, hospitalizationHours, _) =>
         {
             val pastSurgeryTuple = (surgeryDurationMinutes, restingMinutes, hospitalizationHours)
             sumTwoTuples(tuple, pastSurgeryTuple)

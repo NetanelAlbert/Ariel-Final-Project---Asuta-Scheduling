@@ -21,6 +21,7 @@ import view.mangerStatistics.windowElements.Styles
 
 import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
+import scala.language.postfixOps
 
 class TableScene(futureSurgeryInfo : Iterable[FutureSurgeryInfo],
                  blocks : Map[LocalDate, Set[Block]],
@@ -78,7 +79,6 @@ class TableScene(futureSurgeryInfo : Iterable[FutureSurgeryInfo],
     
     val prevButton = new ImageView(new Image("icons/back-circle-50.png", 25, 25, true, true))
     {
-//        prefWidth = 150
         pickOnBounds = true
         onMouseClicked = _ =>
         {
@@ -105,7 +105,6 @@ class TableScene(futureSurgeryInfo : Iterable[FutureSurgeryInfo],
     
     val nextButton = new ImageView(new Image("icons/next-circle-50.png", 25, 25, true, true))
     {
-//        prefWidth = 150
         pickOnBounds = true
         onMouseClicked = _ =>
         {
@@ -150,10 +149,8 @@ class TableScene(futureSurgeryInfo : Iterable[FutureSurgeryInfo],
     
     def showGetSuggestionsDialog
     {
-        // TODO get values from table selection items
         val hours = m_table.workingHours
-        val from = hours.head
-        val to = from.plusHours(3)
+        val (from, to) = m_table.getSelectedBlock()
     
         val converter = new StringConverter[LocalTime]
         {

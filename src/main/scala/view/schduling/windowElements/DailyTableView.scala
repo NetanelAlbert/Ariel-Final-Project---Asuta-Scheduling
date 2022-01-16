@@ -9,13 +9,15 @@ import scalafx.stage.Screen
 import scala.collection.JavaConverters.seqAsJavaListConverter
 import scala.collection.convert.ImplicitConversions.`collection AsScalaIterable`
 import common.Utils._
+import javafx.scene.control.SelectionMode
+import javafx.scene.input.MouseEvent
 
 
 class DailyTableView(futureSurgeryInfo : Iterable[FutureSurgeryInfo], blocks : Map[LocalDate, Set[Block]], settings : Settings) extends SpreadsheetView
 {
     val operationRooms = settings.numberOfOperationRooms
     private var today = LocalDate.now()
-    private def todayBlocks = blocks.getOrElse(today, Set[Block]())
+    private def todayBlocks : Set[Block] = blocks.getOrElse(today, Set[Block]())
     println(s"today = $today")
     println(s"todayBlocks: $todayBlocks")
     println(s"blocks: ${blocks.mkString("\n")}")
@@ -36,6 +38,7 @@ class DailyTableView(futureSurgeryInfo : Iterable[FutureSurgeryInfo], blocks : M
     setContent
     def setContent
     {
+        this.getSelectionModel.clearSelection()
         val rows : ObservableList[ObservableList[SpreadsheetCell]] = FXCollections.observableArrayList()
         workingHours.map(getRow).foreach(rows.add)
         
@@ -45,10 +48,12 @@ class DailyTableView(futureSurgeryInfo : Iterable[FutureSurgeryInfo], blocks : M
         todayBlocks.foreach
         {
             block =>
+            {
                 val span = spanningForCell(block)
                 val row = block.blockStart.getHourOfDay - dayStart.getHourOfDay
                 val col = block.operationRoom
                 grid.spanRow(span, row, col)
+            }
         }
     }
     
@@ -57,6 +62,67 @@ class DailyTableView(futureSurgeryInfo : Iterable[FutureSurgeryInfo], blocks : M
     override def deleteSelectedCells() : Unit = {/* Do nothing */}
     this.setContextMenu(null)
     
+    this.addEventFilter(MouseEvent.MOUSE_PRESSED, (_ : MouseEvent ) =>
+    {
+        this.getSelectionModel.setSelectionMode(SelectionMode.SINGLE)
+    })
+    this.addEventFilter(MouseEvent.MOUSE_RELEASED, (_ : MouseEvent ) =>
+    {
+        val pos = this.getSelectionModel.getFocusedCell
+        println(s"NA:: MouseEvent.MOUSE_CLICKED - pos = $pos")
+        if(pos.getColumn == 0)
+        {
+            this.getSelectionModel.clearSelection()
+        }
+        else
+        {
+            val room = pos.getColumn + 1
+            val hour = dayStart.plusHours(pos.getRow)
+            val blocks = todayBlocks.filter(_.operationRoom == room)
+            if(blocks.exists(block =>
+                                  { //TODO Check terms
+                                      block.blockStart.isBefore(hour.plusHours(1)) &&
+                                      block.blockEnd.isAfter(hour)
+                                  }))
+            {
+                this.getSelectionModel.clearSelection()
+            }
+            else
+            {
+                val startLine = blocks.filter(_.blockEnd.isBefore(hour))
+                                     .map(_.blockEnd.getHourOfDay - dayStart.getHourOfDay)
+                                     .reduceOption(_ max _)
+                                     .getOrElse(0)
+    
+                //TODO Check +/- 1
+                val endLine = blocks.filter(_.blockStart.isAfter(hour.plusHours(1)))
+                                      .map(_.blockStart.getHourOfDay - dayStart.getHourOfDay)
+                                      .reduceOption(_ min _)
+                                      .getOrElse(grid.getRows.size() - 1)
+    
+                val column = getColumns.get(pos.getColumn)
+                
+                this.getSelectionModel.setSelectionMode(SelectionMode.MULTIPLE)
+                this.getSelectionModel.selectRange(startLine, column, endLine, column)
+            }
+        }
+    })
+    
+    def getSelectedBlock() : (LocalTime, LocalTime) =
+    {
+        val selectedCells = this.getSelectionModel.getSelectedCells
+        if(selectedCells.isEmpty)
+        {
+            (dayStart, dayStart.plusHours(5))
+        }
+        else
+        {
+            val start = selectedCells.map(_.getRow).min
+            val end = selectedCells.map(_.getRow).max
+            (dayStart.plusHours(start), dayStart.plusHours(end))
+        }
+    
+    }
     
     private def surgeryForCell(time : LocalTime, room : Int) : Option[Block] =
     {

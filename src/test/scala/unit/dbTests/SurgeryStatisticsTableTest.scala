@@ -2,7 +2,6 @@ package unit.dbTests
 
 import model.DTOs.SurgeryStatistics
 import model.database.{DBConnection, SurgeryStatisticsTable}
-import org.apache.commons.math3.distribution.EnumeratedIntegerDistribution
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 
 import scala.concurrent.ExecutionContext

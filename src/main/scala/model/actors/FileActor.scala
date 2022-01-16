@@ -3,16 +3,17 @@ package model.actors
 import akka.actor.{ActorRef, Props}
 import model.DTOs.{FutureSurgeryInfo, PastSurgeryInfo}
 import org.apache.poi.ss.usermodel.{DataFormatter, Row, Sheet, WorkbookFactory}
-import org.joda.time.{Days, Duration, Hours, LocalDate, LocalDateTime, Minutes}
+import org.joda.time.{Days, Duration, Hours, LocalDate, LocalDateTime, LocalTime, Minutes}
 import org.joda.time.format.DateTimeFormat
 import work._
 
-import java.io.File
+import java.io.{File, FileInputStream}
 import java.util.concurrent.TimeUnit
 import scala.collection.JavaConversions._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 import common.Utils._
+import com.monitorjbl.xlsx.StreamingReader
 
 object FileActor
 {
@@ -53,7 +54,10 @@ class FileActor(m_controller : ActorRef,
     {
         Future
         {
-            getSheet(file).flatMap(getFutureSurgeryFromRow)
+            val (sheet, clean) = getSheet(file)
+            val futureSurgeries = sheet.flatMap(getFutureSurgeryFromRow)
+            clean()
+            futureSurgeries
         }.onComplete
         {
             case Success(futureSurgeries) if futureSurgeries.nonEmpty =>
@@ -93,8 +97,12 @@ class FileActor(m_controller : ActorRef,
     {
         Future
         {
-            val doctorsProfit = getSheet(file, 0).flatMap(getTuple2FromRow(_.toInt, _.toInt))
-            val surgeriesProfit = getSheet(file, 1).flatMap(getTuple2FromRow(_.toDouble, _.toInt))
+            val (doctorsSheet, doctorsClean) = getSheet(file, 0)
+            val doctorsProfit = doctorsSheet.flatMap(getTuple2FromRow(_.toInt, _.toInt))
+            val (surgeriesSheet, surgeriesClean) = getSheet(file, 1)
+            val surgeriesProfit = surgeriesSheet.flatMap(getTuple2FromRow(_.toDouble, _.toInt))
+            doctorsClean()
+            surgeriesClean()
             (doctorsProfit, surgeriesProfit)
         } onComplete
         {
@@ -126,8 +134,9 @@ class FileActor(m_controller : ActorRef,
     
     def readSurgeryMappingExcelWork(work : ReadSurgeryMappingExcelWork, file : File)
     {
-        val surgeryMapping = getSheet(file).map(getDoubleStringFromRow).flatten.toMap.filter(_._2.nonEmpty)
-        
+        val (sheet, clean) = getSheet(file)
+        val surgeryMapping = sheet.flatMap(getDoubleStringFromRow).toMap.filter(_._2.nonEmpty)
+        clean()
         if (surgeryMapping.nonEmpty)
         {
             m_databaseActor ! work.copy(surgeryMapping = Some(surgeryMapping))
@@ -155,7 +164,9 @@ class FileActor(m_controller : ActorRef,
     
     def readDoctorMappingExcelWork(work : ReadDoctorsMappingExcelWork, file : File)
     {
-        val doctorMapping = getSheet(file).map(getIntStringFromRow).flatten.toMap.filter(_._2.nonEmpty)
+        val (sheet, clean) = getSheet(file)
+        val doctorMapping = sheet.flatMap(getIntStringFromRow).toMap.filter(_._2.nonEmpty)
+        clean()
         
         if (doctorMapping.nonEmpty)
         {
@@ -177,8 +188,18 @@ class FileActor(m_controller : ActorRef,
     {
         Future
         {
-    
-            getSheet(file).par.flatMap(getPastSurgeryFromRow)
+            val start = System.currentTimeMillis()
+            
+            val (sheet, clean) = getSheet(file)
+//            sheet.foreach(row => println(row.getCell(3)))
+            val pastSurgeryInfoIterable = sheet.flatMap(getPastSurgeryFromRow).toVector
+            clean()
+            
+            val end = System.currentTimeMillis()
+            val duration = new Duration(start, end)
+            println(s"NA:: readPastSurgeriesExcelWork duration = $duration")
+            
+            pastSurgeryInfoIterable
         }.onComplete
         {
             case Success(pastSurgeryInfoIterable) if pastSurgeryInfoIterable.nonEmpty =>
@@ -210,6 +231,7 @@ class FileActor(m_controller : ActorRef,
             case Failure(exception) =>
             {
                 val info = s"Can't read old surgeries from '${file.getPath}''"
+                m_logger.error(exception, info)
                 m_controller ! WorkFailure(readPastSurgeriesExcelWork, Some(exception), Some(info))
             }
         }
@@ -227,9 +249,7 @@ class FileActor(m_controller : ActorRef,
             val hospitalizationHours = hoursDiff(row, restingStartIndex, releaseDateIndex, "hospitalizationHours")
             
             val blockStartString = formatter.formatCellValue(row.getCell(blockStartIndex))
-            val blockStart = dateTimeFormat.parseLocalDateTime(blockStartString)
-            val blockEndString = formatter.formatCellValue(row.getCell(blockEndIndex))
-            val blockEnd = dateTimeFormat.parseLocalDateTime(blockEndString)
+            val blockStart = dateTimeFormat.parseLocalDateTime(blockStartString).toDate.getTime
             
 //            println(
 //                s"""NA:: getPastSurgeryFromRow()
@@ -250,8 +270,7 @@ class FileActor(m_controller : ActorRef,
                             surgeryDurationMinutes,
                             restingMinutes,
                             hospitalizationHours,
-                            blockStart,
-                            blockEnd)
+                            blockStart)
         }.toOption
     }
     
@@ -328,13 +347,26 @@ class FileActor(m_controller : ActorRef,
     }
     
     //TODO:: handle fail? maybe validate file on UI?
-    def getSheet(file : File, index : Int = 0) : Iterable[Row] =
+    def getSheet(file : File, index : Int = 0) : (Iterable[Row], () => Unit) =
     {
-        //TODO:: use less memory (option - https://stackoverflow.com/a/28397328/11845387)
-        val workbook = WorkbookFactory.create(file)
+//        //TODO:: use less memory (option - https://stackoverflow.com/a/28397328/11845387)
+//        val workbook = WorkbookFactory.create(file)
+//        val sheet = workbook.getSheetAt(index)
+//        workbook.close()
+//        sheet
+    
+
+
+        val is = new FileInputStream(file)
+        val workbook = StreamingReader.builder()
+                                      .rowCacheSize(100)    // number of rows to keep in memory (defaults to 10)
+//                                      .bufferSize(4096)     // buffer size to use when reading InputStream to file (defaults to 1024)
+                                      .open(file);            // InputStream or File for XLSX file (required)
+    
         val sheet = workbook.getSheetAt(index)
-        workbook.close()
-        sheet
+        def clean() = {is.close(); workbook.close()}
+    
+        (sheet, clean)
     }
     
     

@@ -2,7 +2,6 @@ package model.database
 
 import model.DTOs.{OperationCodeAndName, SurgeryStatistics}
 import model.probability.IntegerDistribution
-import org.apache.commons.math3.distribution.EnumeratedIntegerDistribution
 import slick.jdbc.HsqldbProfile.api._
 import slick.jdbc.HsqldbProfile.backend.DatabaseDef
 import slick.lifted.ProvenShape.proveShapeOf

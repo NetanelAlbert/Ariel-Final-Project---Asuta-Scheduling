@@ -2,7 +2,6 @@ package model.DTOs
 
 import model.DTOs.Priority.Priority
 import model.probability.IntegerDistribution
-import org.apache.commons.math3.distribution.EnumeratedIntegerDistribution
 import org.joda.time.{Days, LocalTime}
 
 import java.io.{ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream}

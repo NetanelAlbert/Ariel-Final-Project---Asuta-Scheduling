@@ -9,7 +9,7 @@ import scalafx.scene.control.TableCell
 import view.common.UiUtils.Double2digitsMapper
 
 
-class Columns(
+class ColumnsFactory(
     doctorsStatistics : Seq[DoctorStatistics],
     surgeryAvgInfoByDoctorMap : Map[Int, Seq[SurgeryAvgInfoByDoctor]],
     surgeryAvgInfoList : Seq[SurgeryAvgInfo],
@@ -45,13 +45,19 @@ class Columns(
     private val globalAvgCol = new TableColumn[DoctorStatistics, Int]()
     globalAvgCol.cellFactory = _ => Cells.trafficLightsBackgroundCell
  
+    val tripleColumns = List[javafx.scene.control.TableColumn[DoctorStatistics, _]](
+        surgeryDurationAvgMinutesCol,
+        restingDurationAvgMinutesCol,
+        hospitalizationDurationAvgHoursCol,
+    )
     
-    val columns = List[javafx.scene.control.TableColumn[DoctorStatistics, _]](nameCol,
-                                                                              profitAvgCol,
-                                                                              surgeryDurationAvgMinutesCol,
-                                                                              restingDurationAvgMinutesCol,
-                                                                              hospitalizationDurationAvgHoursCol,
-                                                                              globalAvgCol)
+    val columns = List[javafx.scene.control.TableColumn[DoctorStatistics, _]](
+        nameCol,
+        profitAvgCol,
+        surgeryDurationAvgMinutesCol,
+        restingDurationAvgMinutesCol,
+        hospitalizationDurationAvgHoursCol,
+        globalAvgCol)
     
     setColumnsNames(ColumnsNormalNames)
     
@@ -258,6 +264,8 @@ class PersonalAvgDiffColumn(valueMapper : DoctorStatistics => Double, initialMap
     private var m_personalMapper : DoctorStatistics => DoctorStatistics = identity
     private var m_avgMapper : DoctorStatistics => DoctorStatistics = identity
     private var m_diffMapper : DoctorStatistics => DoctorStatistics = identity
+    private val m_personalAvgDiffColumn = this
+    
 
     val avgCol = new Column("Average", m_avgMapper)
     val personalCol = new Column("Personal", m_personalMapper)
@@ -294,6 +302,7 @@ class PersonalAvgDiffColumn(valueMapper : DoctorStatistics => Double, initialMap
         style = "-fx-alignment: center;"
         prefWidth = 100
         refreshCellValueFactory()
+        delegate.prefWidthProperty().bind(m_personalAvgDiffColumn.widthProperty().divide(3))
         
         def refreshCellValueFactory()
         {
