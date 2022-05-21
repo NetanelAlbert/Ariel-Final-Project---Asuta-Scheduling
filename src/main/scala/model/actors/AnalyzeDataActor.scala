@@ -5,12 +5,12 @@ import akka.actor.{ActorRef, Props}
 import model.DTOs.Priority.Priority
 import model.DTOs._
 import model.probability.IntegerDistribution
-import org.joda.time.{DateTime, Duration, LocalDate, LocalDateTime, LocalTime}
-import work.{BlockFillingOption, GetOptionsForFreeBlockWork, ReadPastSurgeriesExcelWork, WorkFailure, WorkSuccess}
+import org.joda.time._
+import work._
 
 import scala.concurrent.duration.{DurationInt, DurationLong, FiniteDuration}
-import scala.concurrent.{Await, ExecutionContext, Future}
-import scala.util.{Failure, Success, Try}
+import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success}
 
 object AnalyzeDataActor
 {
@@ -26,14 +26,17 @@ class AnalyzeDataActor(m_controller : ActorRef,
     {
         case work : ReadPastSurgeriesExcelWork => readPastSurgeriesExcelWork(work, work.pasteSurgeries)
         
-        case work @ GetOptionsForFreeBlockWork(startTime, endTime, date, Some(doctorsWithSurgeries), Some(doctorMapping), Some(surgeryStatistics), Some(surgeryAvgInfo), Some(plannedSurgeries), Some(plannedSurgeryStatistics), Some(doctorsPriorityMap), _) => getOptionsForFreeBlockWork(work, doctorsWithSurgeries, doctorMapping, surgeryStatistics, surgeryAvgInfo, plannedSurgeries, plannedSurgeryStatistics, doctorsPriorityMap, startTime, endTime, date)
+        case work @ GetOptionsForFreeBlockWork(startTime, endTime, date, Some(doctorsWithSurgeries), Some(doctorMapping), Some(surgeryStatistics), Some(plannedSurgeriesAvgInfo), Some(plannedSurgeries), Some(plannedSurgeryStatistics), Some(doctorsPriorityMap), _) =>
+        {
+            getOptionsForFreeBlockWork(work, doctorsWithSurgeries, doctorMapping, surgeryStatistics, plannedSurgeriesAvgInfo, plannedSurgeries, plannedSurgeryStatistics, doctorsPriorityMap, startTime, endTime, date)
+        }
     }
     
     def getOptionsForFreeBlockWork(work : GetOptionsForFreeBlockWork,
                                    doctorsWithSurgeries : Map[Int, Seq[SurgeryAvgInfoByDoctor]],
                                    doctorMapping : Map[Int, String],
                                    surgeryStatistics : Seq[SurgeryStatistics],
-                                   surgeryAvgInfo : Seq[SurgeryAvgInfo],
+                                   plannedSurgeriesAvgInfo : Seq[SurgeryAvgInfo],
                                    plannedSurgeries : Seq[FutureSurgeryInfo],
                                    plannedSurgeryStatistics : Seq[SurgeryStatistics],
                                    doctorsPriorityMap : Map[Int, Priority],
@@ -41,53 +44,76 @@ class AnalyzeDataActor(m_controller : ActorRef,
                                    endTime : LocalTime,
                                    date : LocalDate)
     {
-        // TODO remove Await - use for comprehension for all the function
-        val settings = Await.result(getSettings, 5 second)
-        val startFunctionTime = new LocalTime()
-        m_logger.info("Starting AnalyzeDataActor.getOptionsForFreeBlockWork")
-    
-        val startDateTime = date.toDateTime(startTime)
-        // The distributions of the number of used resting/hospitalize beds,
-        //  in some points from the start of this block
-        val plannedSurgeriesRestingBedsDistributions = plannedSurgeriesRestingDistributions(settings, startDateTime, plannedSurgeries, plannedSurgeryStatistics)
-        val plannedSurgeriesHospitalizeBedsDistributions = plannedSurgeriesHospitalizeDistributions(settings, startDateTime, plannedSurgeries, plannedSurgeryStatistics)
-        
-        val windowSizeMinutes = (endTime.getMillisOfDay - startTime.getMillisOfDay).millis.toMinutes.toInt
-        // The collections of suggested surgeries, per available doctor
-        val doctorsSacks = doctorsWithSurgeries.values.par.map(getDoctorSurgeriesSuggestions(windowSizeMinutes, settings))
-        
-        if(doctorsSacks.exists(_.nonEmpty))
+        getSettings.onComplete
         {
-            // The collections above, with scores for each one (e.g. the chance of resting beds shortage)
-            val options = doctorsSacks.filter(_.nonEmpty).par.map
+            case Success(settings) =>
             {
-                getBlockFillingOptionMapper(settings, surgeryStatistics, doctorMapping, plannedSurgeriesRestingBedsDistributions, plannedSurgeriesHospitalizeBedsDistributions, doctorsPriorityMap)
-            }.toList
+                val startFunctionTime = new LocalTime()
+                m_logger.info("Starting AnalyzeDataActor.getOptionsForFreeBlockWork")
     
-            m_controller ! WorkSuccess(work.copy(topOptions = Some(options)), Some(s"Found the top options for $startTime - $endTime"))
-        }
-        else
-        {
-            m_controller ! WorkFailure(work, None, Some("All of the doctors optional surgeries was empty"))
-        }
+                val startDateTime = date.toDateTime(startTime)
+                // The distributions of the number of used resting/hospitalize beds,
+                //  in some points from the start of this block
+                val plannedSurgeriesRestingBedsDistributions = plannedSurgeriesRestingDistributions(settings, startDateTime, plannedSurgeries, plannedSurgeryStatistics, plannedSurgeriesAvgInfo)
+                val plannedSurgeriesHospitalizeBedsDistributions = plannedSurgeriesHospitalizeDistributions(settings, startDateTime, plannedSurgeries, plannedSurgeryStatistics, plannedSurgeriesAvgInfo)
+    
+                val windowSizeMinutes = (endTime.getMillisOfDay - startTime.getMillisOfDay).millis.toMinutes.toInt
+                // The collections of suggested surgeries, per available doctor
+                val doctorsSacks = doctorsWithSurgeries.values.par.map(getDoctorSurgeriesSuggestions(windowSizeMinutes, settings))
+    
+                if (doctorsSacks.exists(_.nonEmpty))
+                {
+                    val blockFillingOptionMapper = getBlockFillingOptionMapper(settings, surgeryStatistics, doctorMapping, plannedSurgeriesRestingBedsDistributions, plannedSurgeriesHospitalizeBedsDistributions, doctorsPriorityMap)
+                    // The collections above, with scores for each one (e.g. the chance of resting beds shortage)
+                    val options = doctorsSacks.filter(_.nonEmpty).par.map
+                    {
+                        blockFillingOptionMapper
+                    }.toList
         
-        //todo remove duration - for debugging
-        val duration = new Duration(startFunctionTime.toDateTimeToday, new LocalTime().toDateTimeToday)
-        m_logger.info("Ending AnalyzeDataActor.getOptionsForFreeBlockWork")
-        m_logger.info(s"Duration: $duration")
+                    m_controller ! WorkSuccess(work.copy(topOptions = Some(options)), Some(s"Found the top options for $startTime - $endTime"))
+                }
+                else
+                {
+                    m_controller ! WorkFailure(work, None, Some("All of the doctors optional surgeries was empty"))
+                }
+    
+                //todo remove duration - for debugging
+                val duration = new Duration(startFunctionTime.toDateTimeToday, new LocalTime().toDateTimeToday)
+                m_logger.info("Ending AnalyzeDataActor.getOptionsForFreeBlockWork")
+                m_logger.info(s"Duration: $duration")
+            }
+    
+            case Failure(exception) =>
+            {
+                m_controller ! WorkFailure(work, Some(exception), Some("Failed to fetch settings"))
+            }
+        }
     }
     
-    def plannedSurgeriesRestingDistributions(settings : Settings, startDateTime : DateTime, plannedSurgeries : Seq[FutureSurgeryInfo], plannedSurgeryStatistics : Seq[SurgeryStatistics]) : Map[Int, IntegerDistribution] =
+    def addTimes(settings : Settings)(sack : Seq[SurgeryAvgInfoByDoctor]) : Seq[(SurgeryAvgInfoByDoctor, Int)] =
     {
-        plannedSurgeriesDistributions(_.restingDistribution, _.toMinutes)(settings, startDateTime, plannedSurgeries, plannedSurgeryStatistics)
+        var time = 0
+        sack.map
+        {
+            surg =>
+            {
+                time += surg.durationIncludePrepareTime(settings)
+                surg -> time
+            }
+        }
     }
     
-    def plannedSurgeriesHospitalizeDistributions(settings : Settings, startDateTime : DateTime, plannedSurgeries : Seq[FutureSurgeryInfo], plannedSurgeryStatistics : Seq[SurgeryStatistics]) : Map[Int, IntegerDistribution] =
+    def plannedSurgeriesRestingDistributions(settings : Settings, startDateTime : DateTime, plannedSurgeries : Seq[FutureSurgeryInfo], plannedSurgeryStatistics : Seq[SurgeryStatistics], plannedSurgeriesAvgInfo : Seq[SurgeryAvgInfo]) : Map[Int, IntegerDistribution] =
     {
-        plannedSurgeriesDistributions(_.hospitalizationDistribution, _.toHours)(settings, startDateTime, plannedSurgeries, plannedSurgeryStatistics)
+        plannedSurgeriesDistributions(_.restingDistribution, _.toMinutes, plannedSurgeriesAvgInfo)(settings, startDateTime, plannedSurgeries, plannedSurgeryStatistics)
     }
     
-    def plannedSurgeriesDistributions(distribution : SurgeryStatistics => IntegerDistribution, timeUnit : FiniteDuration => Long)
+    def plannedSurgeriesHospitalizeDistributions(settings : Settings, startDateTime : DateTime, plannedSurgeries : Seq[FutureSurgeryInfo], plannedSurgeryStatistics : Seq[SurgeryStatistics], plannedSurgeriesAvgInfo : Seq[SurgeryAvgInfo]) : Map[Int, IntegerDistribution] =
+    {
+        plannedSurgeriesDistributions(_.hospitalizationDistribution, _.toHours, plannedSurgeriesAvgInfo)(settings, startDateTime, plannedSurgeries, plannedSurgeryStatistics)
+    }
+    
+    def plannedSurgeriesDistributions(distribution : SurgeryStatistics => IntegerDistribution, timeUnit : FiniteDuration => Long, plannedSurgeriesAvgInfo : Seq[SurgeryAvgInfo])
                                      (settings : Settings, startDateTime : DateTime, plannedSurgeries : Seq[FutureSurgeryInfo], plannedSurgeryStatistics : Seq[SurgeryStatistics]) : Map[Int, IntegerDistribution] =
     {
         if(plannedSurgeries.nonEmpty)
@@ -99,11 +125,12 @@ class AnalyzeDataActor(m_controller : ActorRef,
             // The distribution for each surgery x, that the patient is still resting / hospitalizing
             val distributions = plannedSurgeries.map(surgery =>
             {
-                 val surgeryStartTime = surgery.plannedStart.toDateTime
-                 val diffDuration = new Duration(startDateTime, surgeryStartTime).getMillis.millis
-                 val diff = timeUnit(diffDuration).toInt // Hours / Minutes
-                 val timelessDistribution = plannedSurgeryStatistics.find(_.operationCode == surgery.operationCode).map(distribution).get
-                 timelessDistribution + diff
+                val surgeryStartTime = surgery.plannedStart.toDateTime
+                val diffDuration = new Duration(startDateTime, surgeryStartTime).getMillis.millis
+                val diff = timeUnit(diffDuration).toInt // Hours / Minutes
+                val timelessDistribution = plannedSurgeryStatistics.find(_.operationCode == surgery.operationCode).map(distribution).get
+                val surgeryLength = plannedSurgeriesAvgInfo.find(_.operationCode == surgery.operationCode).map(_.surgeryDurationAvgMinutes).get
+                timelessDistribution + (diff + surgeryLength.toInt)
             })
         
             val step = maxValue / numberOfSteps
@@ -153,7 +180,11 @@ class AnalyzeDataActor(m_controller : ActorRef,
             val smallEnoughSurgeries = surgeries.filter(_.durationIncludePrepareTime(settings) <= w)
             if(smallEnoughSurgeries.nonEmpty)
             {
-                val options = smallEnoughSurgeries.map(surg => surg.value + m(w - surg.durationIncludePrepareTime(settings)) -> surg).toMap
+                val options = smallEnoughSurgeries.map(surg =>
+                {
+                    val newValue = surg.value + m(w - surg.durationIncludePrepareTime(settings))
+                    newValue -> surg
+                }).toMap
                 val best = options(options.keys.max)
                 m(w) = best.value + m(w - best.durationIncludePrepareTime(settings))
                 sacks(w) = sacks(w - best.durationIncludePrepareTime(settings)) :+ best
@@ -163,7 +194,14 @@ class AnalyzeDataActor(m_controller : ActorRef,
         sacks(W)
     }
     
-    def getBlockFillingOptionMapper(settings : Settings, surgeryStatistics : Seq[SurgeryStatistics], doctorNameMapping : Map[Int, String], plannedSurgeriesRestingBedsDistributions : Map[Int, IntegerDistribution], plannedSurgeriesHospitalizeBedsDistributions : Map[Int, IntegerDistribution], doctorsPriorityMap : Map[Int, Priority]) : Seq[SurgeryAvgInfoByDoctor] => BlockFillingOption =
+    def getBlockFillingOptionMapper(
+        settings : Settings,
+        surgeryStatistics : Seq[SurgeryStatistics],
+        doctorNameMapping : Map[Int, String],
+        plannedSurgeriesRestingBedsDistributions : Map[Int, IntegerDistribution],
+        plannedSurgeriesHospitalizeBedsDistributions : Map[Int, IntegerDistribution],
+        doctorsPriorityMap : Map[Int, Priority]
+    ) : Seq[SurgeryAvgInfoByDoctor] => BlockFillingOption =
     {
         val operationToSurgeryBasicInfoMapping = surgeryStatistics.map(surgery => surgery.operationCode -> surgery.basicInfo).toMap
         val operationToProfitMapping = surgeryStatistics.flatMap
@@ -179,18 +217,28 @@ class AnalyzeDataActor(m_controller : ActorRef,
     
         def getBlockFillingOption(surgeryAvgInfoByDoctorSeq : Seq[SurgeryAvgInfoByDoctor]) : BlockFillingOption =
         {
-            val newSurgeriesRestingDistributions = surgeryAvgInfoByDoctorSeq.map(surgery => operationToRestingDistributionMapping(surgery.operationCode))
+            val surgeryAvgInfoByDoctorsWithTimes = addTimes(settings)(surgeryAvgInfoByDoctorSeq)
+            
+            val newSurgeriesRestingDistributions = surgeryAvgInfoByDoctorsWithTimes.map
+            {
+                case(surgery, minutes) => operationToRestingDistributionMapping(surgery.operationCode) + minutes
+            }
             val totalRestingBedsDistribution = plannedSurgeriesRestingBedsDistributions.map
             {
                 case (i, distribution) =>
                 {
-                    val newSurgeriesRestingBedsDistribution = IntegerDistribution.sumAndTrim(newSurgeriesRestingDistributions.map(_.indicatorLessThenEq(i).opposite), distributionMaxLength)
+                    
+                    val newSurgeriesRestingIndicators = newSurgeriesRestingDistributions.map(_.indicatorLessThenEq(i).opposite)
+                    val newSurgeriesRestingBedsDistribution = IntegerDistribution.sumAndTrim(newSurgeriesRestingIndicators, distributionMaxLength)
                     IntegerDistribution.sumAndTrim(distributionMaxLength)(distribution, newSurgeriesRestingBedsDistribution)
                 }
             }
             val chanceForRestingShort = totalRestingBedsDistribution.map(_.indicatorLessThenEq(totalNumberOfRestingBeds).no).max
     
-            val newSurgeriesHospitalizationDistributions = surgeryAvgInfoByDoctorSeq.map(surgery => operationToHospitalizationDistributionMapping(surgery.operationCode))
+            val newSurgeriesHospitalizationDistributions = surgeryAvgInfoByDoctorsWithTimes.map
+            {
+                case (surgery, minutes) => operationToHospitalizationDistributionMapping(surgery.operationCode) + minutes / 60
+            }
             val totalHospitalizeBedsDistribution = plannedSurgeriesHospitalizeBedsDistributions.map
             {
                 case (i, distribution) =>
@@ -256,6 +304,15 @@ class AnalyzeDataActor(m_controller : ActorRef,
                 surgeryAvgInfoByDoctorIterable <- surgeryAvgInfoByDoctorIterableFuture
                 doctorStatisticsIterable <- doctorStatisticsIterableFuture
                 doctorAvailabilities <- doctorAvailabilitiesFuture
+    
+                hospital = surgeryStatisticsIterable.map(_.hospitalizationDistribution.support.size)
+                hospitalMax = hospital.max
+                hospitalAVG = hospital.sum / hospital.size.toDouble
+                resting = surgeryStatisticsIterable.map(_.restingDistribution.support.size)
+                restingMax = resting.max
+                restingAVG = resting.sum / resting.size.toDouble
+                _ = println(s"hospitalMax = $hospitalMax \nrestingMax = $restingMax")
+                _ = println(s"hospitalAVG = $hospitalAVG \nrestingAVG = $restingAVG")
             } yield readPastSurgeriesExcelWork.copy(
                 surgeryStatistics = Some(surgeryStatisticsIterable),
                 surgeryAvgInfo = Some(surgeryAvgInfoIterable),

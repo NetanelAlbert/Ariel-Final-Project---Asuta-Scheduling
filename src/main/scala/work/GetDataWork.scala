@@ -33,7 +33,7 @@ case class GetOptionsForFreeBlockWork
     doctorsWithSurgeries : Option[Map[Int, Seq[SurgeryAvgInfoByDoctor]]] = None,
     doctorMapping : Option[Map[Int, String]] = None,
     surgeryStatistics: Option[Seq[SurgeryStatistics]] = None,
-    surgeryAvgInfo: Option[Seq[SurgeryAvgInfo]] = None,
+    plannedSurgeriesAvgInfo: Option[Seq[SurgeryAvgInfo]] = None,
     plannedSurgeries : Option[Seq[FutureSurgeryInfo]] = None,
     plannedSurgeryStatistics : Option[Seq[SurgeryStatistics]] = None,
     doctorsPriorityMap : Option[Map[Int, Priority]] = None,

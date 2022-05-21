@@ -57,8 +57,8 @@ object ManagerMenu
 {
     object Modes
     {
-        val BASIC = "Basic Information"
-        val IMPROVE_AVG = "Improvement Information - Average"
-        val IMPROVE_BY_OP = "Improvement Information By Operation"
+        val BASIC = "Calculate relevant surgeries"
+        val IMPROVE_AVG = "Calculate all surgeries"
+        val IMPROVE_BY_OP = "Calculate for specific surgery"
     }
 }

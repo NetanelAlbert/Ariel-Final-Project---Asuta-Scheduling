@@ -159,9 +159,9 @@ class DatabaseActor(m_controller : ActorRef, m_modelManager : ActorRef)(implicit
         val copyWork = for
         {
             settings <- getSettings
-            
-            doctorIDsNotHidden <- doctorStatisticsTable.getDoctorsIDsWithNotHiddenPriority()//TODO remove +1
-            availableDoctorsIDs <- doctorAvailabilityTable.getAvailableDoctorsIDs(date.getDayOfWeek + 1).flatMap
+    
+            doctorIDsNotHidden <- doctorStatisticsTable.getDoctorsIDsWithNotHiddenPriority()
+            availableDoctorsIDs <- doctorAvailabilityTable.getAvailableDoctorsIDs(date.getDayOfWeek).flatMap
             {
                 case result if result.intersect(doctorIDsNotHidden).isEmpty =>
                 {
@@ -172,9 +172,9 @@ class DatabaseActor(m_controller : ActorRef, m_modelManager : ActorRef)(implicit
 
                 case result => Future.successful(result)
             }
-            
+    
             availableNotHiddenDoctorsIDs = availableDoctorsIDs intersect doctorIDsNotHidden
-            
+    
             doctorsWithSurgeries <- surgeryAvgInfoByDoctorTable.getSurgeriesByDoctors(availableNotHiddenDoctorsIDs)
     
             doctorMapping <- doctorStatisticsTable.getDoctorMapping(doctorsWithSurgeries.keySet)
@@ -182,19 +182,19 @@ class DatabaseActor(m_controller : ActorRef, m_modelManager : ActorRef)(implicit
     
             allSurgeriesID = doctorsWithSurgeries.values.flatten.map(_.operationCode).toSet
             surgeryStatistics <- surgeryStatisticsTable.getByIDsAndValidateSize(allSurgeriesID)
-            surgeryAvgInfo <- surgeryAvgInfoTable.getByIDsAndValidateSize(allSurgeriesID)
-            
+    
             plannedSurgeries <- scheduleTable.selectByDates(date.minusDays(settings.surgeriesForBedCalculationDaysBefore),
-                                                            date.plusDays(settings.surgeriesForBedCalculationDaysAfter))
-                                             .map(_.filter(! _.released))
+                                                                              date.plusDays(settings.surgeriesForBedCalculationDaysAfter))
+                                                 .map(_.filter(! _.released))
             plannedSurgeriesIDs = plannedSurgeries.map(_.operationCode).toSet
             plannedSurgeryStatistics <- surgeryStatisticsTable.getByIDsAndValidateSize(plannedSurgeriesIDs)
-
+            plannedSurgeriesAvgInfo <- surgeryAvgInfoTable.getByIDsAndValidateSize(plannedSurgeriesIDs)
+    
             doctorsPriorityMap <- doctorStatisticsTable.getDoctorsPriority()
         } yield work.copy(doctorsWithSurgeries = Some(doctorsWithSurgeries),
                           doctorMapping = Some(doctorMapping),
                           surgeryStatistics = Some(surgeryStatistics),
-                          surgeryAvgInfo = Some(surgeryAvgInfo),
+                          plannedSurgeriesAvgInfo = Some(plannedSurgeriesAvgInfo),
                           plannedSurgeries = Some(plannedSurgeries),
                           plannedSurgeryStatistics = Some(plannedSurgeryStatistics),
                           doctorsPriorityMap = Some(doctorsPriorityMap)

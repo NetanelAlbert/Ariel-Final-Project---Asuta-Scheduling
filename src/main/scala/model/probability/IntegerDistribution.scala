@@ -5,7 +5,6 @@ import model.liatAlgorithm.{BellmanFord, MutableGraph}
 import scala.collection.mutable
 
 
-// todo find a way to make it generic and be able to multiply in expectation()
 case class IntegerDistribution(m_distribution: Map[Int, Double]) extends RandomVariable[Int]
 {
     import IntegerDistribution._
@@ -122,11 +121,18 @@ case class IntegerDistribution(m_distribution: Map[Int, Double]) extends RandomV
      */
     def + (valueToAdd : Int) : IntegerDistribution =
     {
-        val newDistribution = m_distribution.map
+        if(valueToAdd == 0)
         {
-            case (oldValue, p) => (oldValue + valueToAdd) -> p
+            this
         }
-        IntegerDistribution(newDistribution)
+        else
+        {
+            val newDistribution = m_distribution.map
+            {
+                case (oldValue, p) => (oldValue + valueToAdd) -> p
+            }
+            IntegerDistribution(newDistribution)
+        }
     }
 }
 

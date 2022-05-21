@@ -199,6 +199,13 @@ class FileActor(m_controller : ActorRef,
             val duration = new Duration(start, end)
             println(s"NA:: readPastSurgeriesExcelWork duration = $duration")
             
+            val surgery = pastSurgeryInfoIterable.map(_.surgeryDurationMinutes).toSet
+            val resting = pastSurgeryInfoIterable.map(_.restingMinutes).toSet
+            val hospitalize = pastSurgeryInfoIterable.map(_.hospitalizationHours).toSet
+            println(s"Surgery: min = ${surgery.min}, max = ${surgery.max}, size = ${surgery.size}")
+            println(s"Resting: min = ${resting.min}, max = ${resting.max}, size = ${resting.size}")
+            println(s"Hospitalize: min = ${hospitalize.min}, max = ${hospitalize.max}, size = ${hospitalize.size}")
+            
             pastSurgeryInfoIterable
         }.onComplete
         {
@@ -223,7 +230,6 @@ class FileActor(m_controller : ActorRef,
                        |resting start: $restingStartIndex
                        |resting end: $restingEndIndex
                        |block start: $blockStartIndex
-                       |block end: $blockEndIndex
                        |release date: $releaseDateIndex""".stripMargin
                 m_controller ! WorkFailure(readPastSurgeriesExcelWork, None, Some(info))
             }
@@ -247,6 +253,10 @@ class FileActor(m_controller : ActorRef,
             val surgeryDurationMinutes = minutesDiff(row, surgeryStartIndex, surgeryEndIndex, "surgeryDurationMinutes")
             val restingMinutes = minutesDiff(row, restingStartIndex, restingEndIndex, "restingMinutes")
             val hospitalizationHours = hoursDiff(row, restingStartIndex, releaseDateIndex, "hospitalizationHours")
+            
+            require(surgeryDurationMinutes >= 0)
+            require(restingMinutes >= 0)
+            require(hospitalizationHours >= 0)
             
             val blockStartString = formatter.formatCellValue(row.getCell(blockStartIndex))
             val blockStart = dateTimeFormat.parseLocalDateTime(blockStartString).toDate.getTime
@@ -321,7 +331,6 @@ class FileActor(m_controller : ActorRef,
         diff(start, end)
     }
     
-    
     object PastSurgeryDataExcelColumns
     {
         val doctorIdIndex = 2
@@ -331,7 +340,6 @@ class FileActor(m_controller : ActorRef,
         val restingStartIndex = 25
         val restingEndIndex = 26
         val blockStartIndex = 27
-        val blockEndIndex = 28
         val releaseDateIndex = 29
     }
     
@@ -354,9 +362,7 @@ class FileActor(m_controller : ActorRef,
 //        val sheet = workbook.getSheetAt(index)
 //        workbook.close()
 //        sheet
-    
-
-
+        
         val is = new FileInputStream(file)
         val workbook = StreamingReader.builder()
                                       .rowCacheSize(100)    // number of rows to keep in memory (defaults to 10)

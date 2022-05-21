@@ -172,7 +172,7 @@ class TableScene(futureSurgeryInfo : Iterable[FutureSurgeryInfo],
         val dialog = new Dialog[Result]() {
             initOwner(stage)
             title = "Get Suggestions"
-            headerText = "Choose time and room"
+            headerText = "Choose window boundaries"
             // Set the button types.
             dialogPane().buttonTypes = Seq(ButtonType.OK, ButtonType.Cancel)
         }

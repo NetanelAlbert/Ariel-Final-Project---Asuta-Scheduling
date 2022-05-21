@@ -51,7 +51,7 @@ object SettingsObject
             totalNumberOfRestingBeds = 10,
             totalNumberOfHospitalizeBeds = 20,
             numberOfOperationRooms = 4,
-            distributionMaxLength = 10,
+            distributionMaxLength = 20,
             numberOfPointsToLookForShortage = 5,
             doctorAvailabilityMonthsToGoBack = 36,
             surgeriesForBedCalculationDaysBefore = 7,
